@@ -1,14 +1,28 @@
 # Summit
 
-**One amount. Many ways to see it.**
+**Understand the math. Earn the climb.**
 
-In **Fraction Peaks**, turn a fraction symbol, a shaded model, and a number line until they agree. Light the beacon, climb the mountain, and use Pip's visual hints to see why the values match.
+Summit is a mountain adventure for the **K–5 Math Game** challenge. Practice addition, subtraction, place value, multiplication, and division on arithmetic trails. In **Fraction Peaks**, turn a fraction symbol, shaded model, and number line until they agree. Correct math earns progress; Pip helps make the next attempt understandable.
 
 [Run locally](#run) · [Walk through the product](docs/PRODUCT-WALKTHROUGH.md) · [Explore the architecture](docs/ARCHITECTURE.md)
 
 <img src="docs/images/fraction-peaks.png" width="760" alt="Fraction Peaks: a target of one half above a three-layer tower, with fraction, shaded model, number-line controls, and Pip's hint panel.">
 
-**A welcoming way back.** After five days away, an optional comeback step offers arithmetic practice one level lower, keeps the learner's history, and uses an available streak freeze to preserve their streak. Returning becomes a clear next step in the adventure.
+## The challenge that guides the product
+
+> Develop an interactive, gamified math experience tailored for elementary students that makes foundational arithmetic concepts both intuitive and engaging.
+>
+> We're looking for: innovative mechanics that encourage steady progression and reward mastery of core numeracy skills.
+
+The design loop is **explore a mathematical relationship → try it → receive useful feedback → earn progress → apply it again**. The mountain, tower, Pip, rewards, stories, journal, and comeback all serve that loop. [Prompt-to-feature mapping](docs/HACKATHON.md#how-the-experience-answers-the-prompt)
+
+## Problem and product hypothesis
+
+**Answer-only practice can hide whether a child understands the number relationship or how much help they needed.** The design challenge is to make that relationship understandable through play and give the child a rewarding, manageable next step.
+
+The hypothesis: directly manipulating equivalent representations makes the relationship visible, while short arithmetic rounds reward independent performance with points and new levels. Fraction Peaks demonstrates the visual mechanic in depth; arithmetic trails apply progression to core numeracy. The journal preserves evidence of help and first attempts.
+
+Comeback supports continuity within this adventure: after five days away, a returning learner can choose arithmetic practice one level lower, retain history, and use an available streak freeze. It appears after a return. These design hypotheses still need evaluation with learners, parents, and tutors.
 
 ## Run
 
@@ -27,13 +41,37 @@ For development, run `npm run dev` and open **http://127.0.0.1:5174**. The inclu
 ## A climb worth exploring
 
 - **Fraction Peaks:** three towers connect equivalent fractions across symbols, same-size shaded wholes, and number lines. A subdivision scaffold makes the unchanged amount visible. Two session checks follow.
-- **Comeback:** choose a gentler arithmetic starting level after a break. The adjustment never goes below level 1, preserves past results, and can use one available streak freeze.
-- **Seven arithmetic trails:** seven distinct questions, three hearts, and a two-minute bonus window. A third incorrect answer ends the round; losing hearts never lowers a practice level. Completing all seven answers with a heart remaining before the window closes earns a 50-point bonus. When the window closes, play continues while hearts remain.
+- **Seven arithmetic trails:** seven distinct questions, three hearts, and a two-minute bonus window. A third miss ends the round without lowering a level. Answering all seven questions with a heart remaining before the window closes earns 50 bonus points; expiry alone never ends play.
+- **Earned progression:** three consecutive correct answers without hints at the current arithmetic difficulty unlock the next level, up to level 10. A hint or miss resets that run, while already unlocked levels remain. Supported correct answers still earn points.
 - **Four story worlds:** space, ocean, dinosaurs, and animals turn a single arithmetic problem into a small story. These rounds have no timer or hearts.
 - **Field journal:** completed practice, first-attempt checks without hints, and supported work stay distinct. Save or resume a fraction climb and export the session record.
 - **Comfort controls:** keyboard and touch controls, optional sound, motion and contrast settings, and browser read-aloud where available. Fraction Peaks stays untimed and heart-free.
 
-The bonus is determined when the last answer is assessed, so taking time to read the results or press Finish does not lose an earned bonus. The [product walkthrough](docs/PRODUCT-WALKTHROUGH.md) explains the flow and the choices behind it.
+The [product walkthrough](docs/PRODUCT-WALKTHROUGH.md) explains each flow, scoring rule, and design tradeoff.
+
+## How the build works
+
+| Layer | Responsibility and reason |
+|---|---|
+| **Frontend — React, TypeScript, Vite** | Renders the tower, models, controls, and journal. The browser checks fraction equivalence with exact integer math, selects authored feedback, and saves fraction sessions locally for resume and review. |
+| **Backend — Express, Node 24, SQLite** | Generates arithmetic problems and stores their answers. The browser sends a problem ID and response; the server owns assessment, hint use, hearts, bonus timing, scores, progression, and recovery. Repeated requests cannot award progress twice. |
+| **Optional AI — server-side Anthropic adapter** | Adds arithmetic stories, hints, and parent guidance around code-generated math. Numeric/format checks screen the text; missing access, failed requests, timeout, or rejected output selects authored content. The source label exposes that choice. Fraction coaching is authored. |
+
+Fraction records live in browser storage; arithmetic records live in local SQLite. The [architecture](docs/ARCHITECTURE.md) traces both paths and their boundaries. AI does not decide mathematical correctness or game progression.
+
+## Success criteria and evidence
+
+| Goal | Success criterion | Evidence and status |
+|---|---|---|
+| **Make the math interaction reliable** | Only equivalent representations light a beacon; feedback targets a mismatch; subdivision preserves the whole and amount. | Implemented; fraction tests and documented browser walkthroughs. |
+| **Reward demonstrated skill with progression** | Three consecutive unhinted correct answers at the current arithmetic difficulty unlock the next level. Easier leftover questions cannot keep unlocking levels; timing alone never unlocks one. | Implemented; progression tests and the documented three-answer level-unlock walkthrough. This is the game's performance rule; longer-term mastery is evaluated separately. |
+| **Keep the record trustworthy** | Hints and retries cannot become independent success; arithmetic answers and repeated requests follow the scoring, recovery, and progression rules. | Implemented; **82 tests and 17,952 deterministic checks pass** across the release. See [QA](docs/QA.md). |
+| **Support independent understanding** | On unseen tasks appropriate to the practiced skill, learners solve arithmetic or match equivalent fractions without hints and explain their reasoning; check again later with different items. | Proposed learner evaluation: record correct unassisted responses / attempted items, explanation quality, and pre/post/delayed results. No learner results yet. |
+| **Make restarting manageable** | Eligible returning learners can begin appropriate practice and work through all seven questions, while feeling comfortable asking for help. | Proposed evaluation: starts / eligible return visits; all-seven-answer rate among starts; accuracy, heart endings, help use, and learner feedback. This measures continuation after a return. |
+
+**Measure today:** the journal separates completed towers, correct first-attempt checks without help, and supported successes. Its two checks repeat, so the counts describe this session. Arithmetic records provide assessed answers, hint use, and round results. These local stores are not a cohort analytics system; learner studies and return-flow instrumentation are still to build.
+
+**Iterate from the evidence:** observe controls first; simplify them if they block progress. If controls work but unseen equivalence tasks fail, revise the scaffold and item sequence. If returning learners start but stop early, examine difficulty, hearts, and the bonus. Observe help-seeking as well as completion—less help is not automatically better. Review AI meaning and suitability separately from its format checks. The [measurement plan](docs/PRODUCT-WALKTHROUGH.md#5-measure-and-iterate) defines the denominators and next experiments.
 
 ## Verify
 
@@ -49,11 +87,11 @@ The **Verify Summit** workflow runs these checks on Node 24. See the [current ve
 
 ## AI, evidence, and release scope
 
-Pip's fraction strategies are authored and deterministic. Optional Anthropic calls add arithmetic stories, hints, and parent guidance; code owns answers, hint state, scores, and progression. Story provenance identifies model output or authored fallback. Numeric and format checks bound the output, but cannot establish every story's meaning or suitability.
+Numeric and format checks bound AI output, but cannot establish every story's meaning or suitability.
 
 To try live AI, copy `.env.example` to a private `.env`, add your own `ANTHROPIC_API_KEY`, restart, and enable **For grown-ups → Optional AI features**. AI starts off. Missing access, provider failure, timeout, or rejected output uses authored content. Keep real keys out of Git and browser code; the example model alias is `claude-sonnet-4-5`.
 
-This release runs locally with one synthetic learner. Accounts, guardian verification, shared storage, and protected administration are needed before public multiuser use. Fraction checks repeat across climbs: the journal describes the current session, without claiming lasting mastery. The comeback rule is a product choice whose effect on return behavior and learning has not yet been measured. [Architecture](docs/ARCHITECTURE.md) and [QA](docs/QA.md) describe the practical limits.
+This release covers selected elementary arithmetic skills and a Grade 4 fraction-equivalence focus; it is a scoped entry for the K–5 prompt, not a complete curriculum for every grade. It runs locally with one synthetic learner. Accounts, guardian verification, shared storage, and protected administration are needed before public multiuser use. Learning gains, delayed retention, and comeback outcomes remain to be evaluated. [Architecture](docs/ARCHITECTURE.md) and [QA](docs/QA.md) describe the practical limits.
 
 ## Built with AI, directed by a person
 
