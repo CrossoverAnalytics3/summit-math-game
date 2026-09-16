@@ -1,0 +1,56 @@
+SUPPLEMENTAL THIRD-PARTY NOTICES FOR SUMMIT
+
+This file supplements THIRD_PARTY_NOTICES.txt. It does not assign a license to the entrant's own application or verify rights in the supplied baseline.
+
+========================================================================
+cookie-signature 1.0.7 — license from published package Readme.md
+========================================================================
+Source: https://github.com/visionmedia/node-cookie-signature
+Package archive: https://registry.npmjs.org/cookie-signature/-/cookie-signature-1.0.7.tgz
+The installed package contains the following license in its Readme.md (HTML angle-bracket entities decoded for plain-text readability):
+
+(The MIT License)
+
+Copyright (c) 2012 LearnBoost <tj@learnboost.com>
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+'Software'), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+========================================================================
+stackback 0.0.2 — available declaration; full text unresolved
+========================================================================
+The installed package manifest declares "license": "MIT" and identifies author Roman Shtylman. This is an attribution from metadata, not an invented copyright notice.
+
+Original manifest repository: git://github.com/shtylman/node-stackback.git
+Current redirected repository: https://github.com/defunctzombie/node-stackback
+Package archive: https://registry.npmjs.org/stackback/-/stackback-0.0.2.tgz
+
+The installed package has no standalone license text. The public upstream file list contains no LICENSE file; checking upstream LICENSE and LICENSE.md did not locate a text. A project-specific full license/copyright notice could not be obtained. Do not present this entry as full legal clearance or silently invent a copyright holder/date. The declared MIT metadata and exact source are preserved for review.
+
+========================================================================
+Optional platform packages
+========================================================================
+The lockfile also inventories optional esbuild/Rollup platform binaries and @napi-rs/lzma-linux-x64-gnu. They are not bundled in the source ZIP, and full license texts for platforms not installed on this machine were not collected. See dependency-inventory-with-sources.md for declared licenses and pinned distribution sources. The inventory is broader than the license texts collected from installed packages.
+
+========================================================================
+Demonstration production tools; not incorporated into the game
+========================================================================
+The optional video/audio workflow used an installed FFmpeg/FFprobe build, Python, and NumPy. These are build/media-production tools, not runtime game dependencies. No executable or library from them is bundled in the application ZIP. FFmpeg reported GPL enabled in its build configuration. This does not mean FFmpeg code was incorporated into the game, and no legal conclusion about output licensing is asserted here.
+
+The instrumental audio was synthesized specifically for the demo from mathematical oscillators, with no third-party recording, sample pack, or song used. See the media-production provenance in the video working records.

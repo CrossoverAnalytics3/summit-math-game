@@ -1,0 +1,111 @@
+import "./env.js";
+import express from "express";
+import { z } from "zod";
+import { randomInt } from "node:crypto";
+import { existsSync } from "node:fs";
+import { extname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { db, seed, reset, today, setToday, addDays } from "./db.js";
+import { logEvent } from "./events.js";
+import { isEnabledFor, rolloutPct } from "./flags.js";
+import { SKILLS, MAX_LEVEL } from "./skills.js";
+import { progress, comebackStatus, applyComeback, weeklyFacts, RUN_TO_UNLOCK } from "./progress.js";
+import { storyProblem, hint, parentNote } from "./ai/story.js";
+import { pickAdapter, stubAdapter } from "./ai/adapter.js";
+import { currentLevel, startRound, saveRound, submitAnswer, finishRound, beginHint, cacheHint } from "./rounds.js";
+
+seed();
+export const app = express();
+app.use(express.json({ limit: "16kb" }));
+const L = "L-1"; // Single synthetic learner: never deploy as a multi-user service.
+const consent = () => (db.prepare("SELECT guardian_consent_ai c FROM learners WHERE id=?").get(L) as { c: number }).c === 1;
+const permittedAdapter = () => consent() ? pickAdapter() : stubAdapter;
+
+const ok = <T>(schema: z.ZodType<T>, body: unknown): T => {
+  const r = schema.safeParse(body);
+  if (!r.success) throw Object.assign(new Error(r.error.issues.map((i) => i.message).join("; ")), { status: 400 });
+  return r.data;
+};
+const asyncRoute = (fn: (req: express.Request, res: express.Response) => Promise<unknown>): express.RequestHandler =>
+  (req, res, next) => { void fn(req, res).catch(next); };
+
+app.get("/api/health", (_req, res) => res.json({ today: today(), ai: permittedAdapter().name, configured_ai: pickAdapter().name, guardian_consent_ai: consent(), rollout_pct: rolloutPct(), story_missions_enabled: isEnabledFor(L) }));
+
+app.get("/api/home", (_req, res) => {
+  const learner = db.prepare("SELECT display_name, age, daily_streak, last_played_on, streak_freeze, guardian_consent_ai FROM learners WHERE id=?").get(L);
+  const prog = progress(L);
+  res.json({
+    learner, today: today(), comeback: comebackStatus(L), run_to_unlock: RUN_TO_UNLOCK, max_level: MAX_LEVEL,
+    guardian_consent_ai: consent(), story_missions_enabled: isEnabledFor(L),
+    skills: SKILLS.map((s) => ({ ...s, ...(prog.find((p) => p.skill_id === s.id) ?? { level: 1, run: 0, high_score: 0, wins: 0, seconds: 0 }) })),
+  });
+});
+
+app.post("/api/settings/ai-consent", (req, res) => {
+  const { enabled } = ok(z.object({ enabled: z.boolean() }).strict(), req.body);
+  db.prepare("UPDATE learners SET guardian_consent_ai=? WHERE id=?").run(enabled ? 1 : 0, L);
+  logEvent("guardian_consent_changed", { learner_id: L, payload: { enabled } });
+  res.json({ guardian_consent_ai: enabled, ai: permittedAdapter().name });
+});
+app.post("/api/comeback/apply", (_req, res) => res.json(applyComeback(L)));
+
+app.post("/api/round", (req, res) => {
+  const { skill_id } = ok(z.object({ skill_id: z.string() }).strict(), req.body);
+  res.json(startRound(L, skill_id));
+});
+app.post("/api/answer", (req, res) => {
+  const b = ok(z.object({ problem_id: z.string().uuid(), answer: z.number().int().finite() }).strict(), req.body);
+  res.json(submitAnswer(L, b.problem_id, b.answer));
+});
+app.post("/api/round/finish", (req, res) => {
+  const b = ok(z.object({ round_id: z.string().uuid() }).strict(), req.body);
+  res.json(finishRound(L, b.round_id));
+});
+
+app.post("/api/story", asyncRoute(async (req, res) => {
+  const b = ok(z.object({ skill_id: z.string(), theme: z.enum(["animals", "space", "ocean", "dinosaurs"]).default("animals") }).strict(), req.body);
+  if (!isEnabledFor(L)) return res.status(404).json({ error: "Story missions are not enabled for this learner" });
+  const level = currentLevel(L, b.skill_id);
+  const r = await storyProblem(b.skill_id, level, randomInt(1, 2 ** 31), b.theme ?? "animals", permittedAdapter());
+  const round = saveRound(L, b.skill_id, level, [r.problem]);
+  logEvent("story_generated", { learner_id: L, payload: { skill_id: b.skill_id, level, source: r.provenance.final_source } });
+  res.json({ round_id: round.round_id, level, problem: round.problems[0], provenance: r.provenance });
+}));
+
+app.post("/api/hint", asyncRoute(async (req, res) => {
+  const b = ok(z.object({ problem_id: z.string().uuid() }).strict(), req.body);
+  const { problem, cached } = beginHint(L, b.problem_id);
+  if (cached) return res.json(cached);
+  const r = await hint(problem, null, permittedAdapter());
+  cacheHint(b.problem_id, r);
+  logEvent("hint_requested", { learner_id: L, payload: { skill_id: problem.skill_id, source: r.provenance.final_source } });
+  res.json(r);
+}));
+
+app.get("/api/parent", asyncRoute(async (_req, res) => {
+  const facts = weeklyFacts(L);
+  const name = (db.prepare("SELECT display_name n FROM learners WHERE id=?").get(L) as { n: string }).n;
+  const note = await parentNote(facts, name, permittedAdapter());
+  res.json({ facts, ...note });
+}));
+
+app.get("/api/events", (_req, res) => res.json(db.prepare("SELECT * FROM events ORDER BY ts DESC, rowid DESC LIMIT 100").all()));
+app.post("/api/clock/advance", (req, res) => { const { days } = ok(z.object({ days: z.number().int().min(1).max(30) }).strict(), req.body); setToday(addDays(today(), days)); res.json({ today: today() }); });
+app.post("/api/admin/reset", (_req, res) => { reset(); res.json({ ok: true }); });
+
+// Unknown API routes always stay JSON, even when the browser build is served.
+app.use("/api", (_req, res) => res.status(404).json({ error: "This trail endpoint was not found" }));
+
+// Building web/dist makes this same local demo server serve the complete game.
+// Development continues to use Vite's proxy and hot reload on port 5174.
+const webDist = fileURLToPath(new URL("../../web/dist/", import.meta.url));
+const webIndex = fileURLToPath(new URL("../../web/dist/index.html", import.meta.url));
+if (existsSync(webIndex)) {
+  app.use(express.static(webDist));
+  app.get("*", (req, res, next) => {
+    if (extname(req.path) || !req.accepts("html")) return next();
+    res.sendFile(webIndex);
+  });
+}
+
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => res.status(err.status ?? 500).json({ error: err.status ? err.message : "Something interrupted this expedition. Please try again." }));

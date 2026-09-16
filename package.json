@@ -1,0 +1,23 @@
+{
+  "name": "summit-math",
+  "private": true,
+  "version": "0.2.0",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c blue,green \"npm run dev -w server\" \"npm run dev -w web\"",
+    "test": "npm test -w server && node --test web/test/fractions.test.ts",
+    "eval": "npm run eval -w server",
+    "start": "npm run start -w server",
+    "build": "npm run build -w web",
+    "typecheck": "tsc -p web/tsconfig.json && tsc -p server/tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
