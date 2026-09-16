@@ -10,7 +10,7 @@ The Claude-assisted foundation supplied the original arithmetic application. The
 
 - **AI-generated scenery:** `web/public/art/summit-island.png` was generated for Summit with the built-in image-generation tool. No third-party reference image was supplied to that generation. The exact prompt and provenance are retained in [ARTWORK.md](ARTWORK.md).
 - **Code-native visuals:** tower geometry, Pip, interface icons, planets, number lines, and fraction models use SVG/CSS/React created during the Codex iteration.
-- **Product screenshot:** the README's Fraction Peaks image is an unmodified capture of the running app with its synthetic demo profile, not a generated mockup.
+- **Product screenshot:** `docs/images/fraction-peaks.png` is an unmodified capture of the running app with its synthetic demo profile, not a generated mockup. The README uses the original mountain scenery PNG described above.
 - **Fonts:** [DM Sans](https://github.com/google/fonts/tree/main/ofl/dmsans) and [Space Grotesk](https://github.com/google/fonts/tree/main/ofl/spacegrotesk) are requested from Google Fonts with system-font fallback. Their upstream repositories distribute the fonts under the SIL Open Font License. Font binaries are not bundled in this source package.
 
 ## Runtime AI

@@ -6,7 +6,7 @@ Summit is a mountain adventure for the **K–5 Math Game** challenge. Practice a
 
 [Run locally](#run) · [Walk through the product](docs/PRODUCT-WALKTHROUGH.md) · [Explore the architecture](docs/ARCHITECTURE.md)
 
-<img src="docs/images/fraction-peaks.png" width="760" alt="Fraction Peaks: a target of one half above a three-layer tower, with fraction, shaded model, number-line controls, and Pip's hint panel.">
+<img src="web/public/art/summit-island.png" width="760" alt="Summit's original hero mountain: a floating, snow-covered alpine island with a glowing path from the cozy basecamp to a flag at the summit.">
 
 ## The challenge that guides the product
 
