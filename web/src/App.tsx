@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
   Icon,
@@ -241,8 +241,9 @@ export default function App() {
             </button>
           </div>
           <p className="small muted">
-            No timers. No lost hearts. Arrow buttons and your keyboard work
-            throughout the game.
+            Fraction Peaks and stories have no clock or hearts. Arithmetic
+            trails have three hearts and a two-minute bonus window that never
+            stops play. Buttons and your keyboard both work.
           </p>
           <Button onClick={() => setSettings(false)}>
             Ready to explore <Icon name="arrow" />
@@ -278,6 +279,13 @@ export default function App() {
                 Ask Pip for help, then try a fresh challenge. Your journal
                 remembers both.
               </p>
+            </div>
+          </div>
+          <div className="how-step">
+            <span>04</span>
+            <div>
+              <h3>Find your way back</h3>
+              <p>After five days away, you can choose a practice level one step easier. Your past achievements stay in your journal.</p>
             </div>
           </div>
           <Button
@@ -358,7 +366,32 @@ function Explore({
   const [filter, setFilter] = useState("All trails"),
     [choose, setChoose] = useState<Skill | null>(null),
     [come, setCome] = useState(home.comeback.due),
+    [comeInfo, setComeInfo] = useState(false),
+    [comeBusy, setComeBusy] = useState(false),
     [error, setError] = useState("");
+  const comeLock = useRef(false);
+  const applyComeback = async () => {
+    if (comeLock.current) return;
+    comeLock.current = true;
+    setComeBusy(true);
+    setError("");
+    try {
+      const comeback = await api("/comeback/apply", {});
+      if (comeback.applied) {
+        // The learner chose a gentler new round. Old assessments remain on
+        // the server, but an old harder round should not override that choice.
+        home.skills.forEach((s) => saveLocal(`summit.arithmetic.active.${s.id}`, null));
+      }
+      await reload();
+      setCome(false);
+      setComeInfo(false);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      comeLock.current = false;
+      setComeBusy(false);
+    }
+  };
   const visible = home.skills.filter((s) =>
     filter === "All trails" || filter === "Early explorers"
       ? filter === "All trails" || ["add20", "sub20", "place"].includes(s.id)
@@ -431,6 +464,18 @@ function Explore({
           How it works <Icon name="arrow" size={17} />
         </button>
       </div>
+      <section className="return-trail" aria-labelledby="return-heading">
+        <div className="return-trail-mark" aria-hidden="true"><Icon name="refresh" size={36} /><span><Icon name="leaf" size={17} /></span></div>
+        <div className="return-trail-copy">
+          <div className="eyebrow">THERE'S A WAY BACK, TOO</div>
+          <h2 id="return-heading">A new day. A softer first step.</h2>
+          <p>After five days away, choose an easier practice level to find your footing. Your past achievements stay in your journal.</p>
+        </div>
+        <button className="return-trail-action" onClick={() => home.comeback.due ? setCome(true) : setComeInfo(true)}>
+          <span>{home.comeback.due ? "Your return trail is ready" : "A little help returning"}</span>
+          {home.comeback.due ? "Choose my way back" : "How a comeback works"} <Icon name="arrow" size={17} />
+        </button>
+      </section>
       <section className="adventures-section">
         <div className="section-heading">
           <div>
@@ -438,7 +483,7 @@ function Explore({
             <h2>Choose a little adventure.</h2>
           </div>
           <span className="quiet-pill">
-            <span className="live-dot" /> No rush. No pressure.
+            <span className="live-dot" /> A path for every kind of day.
           </span>
         </div>
         <div className="adventure-grid">
@@ -579,15 +624,19 @@ function Explore({
           </span>
           <h3 className="modal-lead">A little practice goes a long way.</h3>
           <p className="muted">
-            Seven little challenges, at your own pace. Three independent answers
-            in a row move your practice level up.
+            Seven little challenges and three hearts. A wrong answer uses one
+            heart; after three, start fresh with your level still unlocked.
           </p>
+          <div className="practice-rules">
+            <span><Icon name="spark" size={17} /><span>Finish all seven within two minutes for <strong>+50 points</strong>. After that, keep playing. Your points are safe.</span></span>
+            <span><Icon name="mountain" size={17} /><span>Three correct, independent answers in a row at your current level unlock the next one.</span></span>
+          </div>
           <div className="tip-box">
             <Owl small />
             <p>{choose.tip}</p>
           </div>
           <Button onClick={() => onPractice(choose)}>
-            Start this trail <Icon name="arrow" />
+            {readLocal<{round_id?: string} | null>(`summit.arithmetic.active.${choose.id}`, null)?.round_id ? "Resume this trail" : "Start this trail"} <Icon name="arrow" />
           </Button>
           <Button
             secondary
@@ -598,32 +647,27 @@ function Explore({
           </Button>
         </Modal>
       )}
-      {come && (
-        <Modal title="Good to see you again." onClose={() => setCome(false)}>
+      {(come || comeInfo) && (
+        <Modal title={home.comeback.due ? "Good to see you again." : "Your trail will be here."} onClose={() => {
+          if (!comeBusy) { setCome(false); setComeInfo(false); }
+        }}>
           <Owl />
           <p className="muted">
-            It's been {home.comeback.days_away} days. We can ease the practice
-            level by one to help you find your footing. Your past achievements
-            stay in your journal.
+            {home.comeback.due ? `It's been ${home.comeback.days_away} days. We` : "After five days away, we"} can ease each practice skill by one level, never below level one, to help you find your footing.
+            You choose whether to take the gentler trail. Your past achievements stay in your journal.
           </p>
-          <p>
+          <p className="small muted">Choosing the gentler trail starts fresh practice at that level. Answers from unfinished trails stay in your history.</p>
+          {home.comeback.due && <p>
             {home.comeback.freeze_available
               ? "Your streak protection is ready."
               : "A fresh start is always welcome."}
-          </p>
+          </p>}
           {error && <p role="alert">{error}</p>}
-          <Button
-            onClick={() =>
-              void api("/comeback/apply", {})
-                .then(() => reload())
-                .then(() => setCome(false))
-                .catch((e) => setError(e.message))
-            }
-          >
-            Take the gentle trail <Icon name="leaf" />
-          </Button>
-          <Button secondary onClick={() => setCome(false)}>
-            Keep my current challenge
+          {home.comeback.due && <Button onClick={() => void applyComeback()} disabled={comeBusy}>
+            {comeBusy ? "Finding your footing…" : "Take the gentle trail"} <Icon name="leaf" />
+          </Button>}
+          <Button secondary={home.comeback.due} disabled={comeBusy} onClick={() => { setCome(false); setComeInfo(false); }}>
+            {home.comeback.due ? "Keep my current challenge" : "Ready for my next little adventure"}
           </Button>
         </Modal>
       )}

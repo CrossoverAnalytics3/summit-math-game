@@ -1,12 +1,14 @@
-# Summit original artwork
+# Summit generated artwork and product capture
 
-Asset: `web/public/art/summit-island.png`
+Asset: [`web/public/art/summit-island.png`](../web/public/art/summit-island.png)
 
 Dimensions: 1536 × 1024 pixels.
 
 Generated with the built-in image generation tool on September 15, 2026. This is an original generated asset created for this project; no third-party reference images were supplied. Generated image metadata is retained in the PNG. The original generator output was copied into this project, and no other image modifications were made.
 
 Visual inspection: the mountain island fills the right side, the left side provides dark negative space for accessible headline placement, the basecamp is visible, and the asset includes no text or user interface elements.
+
+The README's [Fraction Peaks screenshot](images/fraction-peaks.png) is an unmodified capture of the running application with its synthetic demo profile, recorded September 15, 2026. It shows the actual fraction interface rather than a generated screen mockup. The tower, Pip, symbols, models, and controls are rendered by the application using SVG/CSS/React with AI-assisted implementation.
 
 ## Exact generation prompt
 

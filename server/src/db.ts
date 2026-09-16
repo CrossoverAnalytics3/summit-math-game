@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE TABLE IF NOT EXISTS rounds (
   id TEXT PRIMARY KEY, learner_id TEXT NOT NULL, skill_id TEXT NOT NULL,
-  level INTEGER NOT NULL, started_at INTEGER NOT NULL, result TEXT
+  level INTEGER NOT NULL, started_at INTEGER NOT NULL, result TEXT,
+  rules TEXT, ended_at INTEGER
 );
 CREATE TABLE IF NOT EXISTS problems (
   id TEXT PRIMARY KEY, round_id TEXT NOT NULL, learner_id TEXT NOT NULL,
@@ -49,6 +50,15 @@ CREATE TABLE IF NOT EXISTS problems (
   result TEXT, hint_response TEXT
 );
 `);
+
+// Preserve existing rounds' original untimed rules instead of retroactively
+// applying hearts or a bonus deadline to already-saved work.
+export function upgradeRoundSchema() {
+  const columns = new Set((db.prepare("PRAGMA table_info(rounds)").all() as { name: string }[]).map((column) => column.name));
+  if (!columns.has("rules")) db.exec("ALTER TABLE rounds ADD COLUMN rules TEXT");
+  if (!columns.has("ended_at")) db.exec("ALTER TABLE rounds ADD COLUMN ended_at INTEGER");
+}
+upgradeRoundSchema();
 
 export function today(): string {
   const r = db.prepare("SELECT value FROM settings WHERE key='today'").get() as { value: string } | undefined;

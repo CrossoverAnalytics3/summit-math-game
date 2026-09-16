@@ -2,6 +2,8 @@
 
 Generated from the project lockfile and available package manifests. Includes runtime and development dependencies; optional platform packages may not be installed on this machine. Declared licenses are metadata, not a legal compatibility judgment.
 
+See the [lockfile](../package-lock.json), [upstream source inventory](materials/dependency-inventory-with-sources.md), [collected notices](materials/THIRD_PARTY_NOTICES.txt), [supplemental notices](materials/supplemental-license-notices.txt), and [licensing guide](LICENSING.md).
+
 | Package | Version | Declared license |
 |---|---|---|
 | @babel/code-frame | 7.29.7 | MIT |

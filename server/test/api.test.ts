@@ -90,7 +90,7 @@ describe("server owns the assessment", () => {
     for (const p of round.problems) await post("/api/answer", { problem_id: p.id, answer: answerFor(p) });
     const first = (await post("/api/round/finish", { round_id: round.round_id })).body;
     const repeat = (await post("/api/round/finish", { round_id: round.round_id })).body;
-    expect(first).toMatchObject({ score: 660, correct: 7, total: 7, won: true });
+    expect(first).toMatchObject({ base_score: 660, bonus_points: 50, score: 710, correct: 7, total: 7, won: true });
     expect(repeat).toEqual(first);
     expect((db.prepare("SELECT level,wins FROM skill_progress WHERE skill_id='add20'").get())).toEqual({ level: 2, wins: 1 });
     expect((db.prepare("SELECT COUNT(*) n FROM events WHERE name='round_finished'").get() as any).n).toBe(1);
@@ -105,6 +105,33 @@ describe("server owns the assessment", () => {
     const response = await post("/api/round", { skill_id: "x".repeat(20_000) });
     expect(response.status).toBe(413);
     expect(response.body.error).toBe("request entity too large");
+  });
+  it("restores only assessed answers and server-marked hints through the round snapshot", async () => {
+    const round = (await post("/api/round", { skill_id: "add20" })).body;
+    expect(round).toMatchObject({ hearts_total: 3, hearts_remaining: 3, bonus_seconds: 120, answered: 0, score: 0 });
+    expect(round.bonus_deadline_at - round.server_now).toBeGreaterThan(119_000);
+    await post("/api/hint", { problem_id: round.problems[3].id });
+    for (const p of round.problems.slice(0, 3)) await post("/api/answer", { problem_id: p.id, answer: answerFor(p) });
+    const snapshot = (await request("GET", `/api/round/${round.round_id}`)).body;
+    expect(snapshot).toMatchObject({ level: 1, current_level: 2, run: 0, answered: 3, hearts_remaining: 3, score: 300, result: null });
+    expect(snapshot.hinted_problem_ids).toEqual([round.problems[3].id]);
+    expect(snapshot.assessments).toHaveLength(3);
+    for (const p of snapshot.problems) expect(p).not.toHaveProperty("answer");
+    expect(snapshot.assessments.some((a: any) => a.problem_id === round.problems[3].id)).toBe(false);
+    expect((await request("GET", "/api/round/not-a-uuid")).status).toBe(400);
+    expect((await request("GET", "/api/round/00000000-0000-4000-8000-000000000000")).status).toBe(404);
+  });
+  it("enforces heart exhaustion and rejects client-supplied game counters through HTTP", async () => {
+    expect((await post("/api/round", { skill_id: "mul", hearts_total: 100, bonus_seconds: 999 })).status).toBe(400);
+    const round = (await post("/api/round", { skill_id: "mul" })).body;
+    expect((await post("/api/answer", { problem_id: round.problems[0].id, answer: 0, hearts_remaining: 3 })).status).toBe(400);
+    for (const p of round.problems.slice(0, 3)) await post("/api/answer", { problem_id: p.id, answer: -1 });
+    expect((await post("/api/answer", { problem_id: round.problems[3].id, answer: 1 })).status).toBe(409);
+    expect((await post("/api/hint", { problem_id: round.problems[3].id })).status).toBe(409);
+    expect((await post("/api/round/finish", { round_id: round.round_id, bonus_points: 50, seconds: 1 })).status).toBe(400);
+    const result = (await post("/api/round/finish", { round_id: round.round_id })).body;
+    expect(result).toMatchObject({ answered: 3, total: 7, ended_reason: "hearts", hearts_remaining: 0, bonus_points: 0, won: false });
+    expect((await request("GET", `/api/round/${round.round_id}`)).body.result).toEqual(result);
   });
 });
 

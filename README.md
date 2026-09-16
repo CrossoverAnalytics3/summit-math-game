@@ -1,14 +1,18 @@
 # Summit
 
-A playable elementary math prototype built around a small mountain adventure. Its featured Grade 4 route makes fraction equivalence tangible: align a symbol, a shaded model, and a point on a number line, then try two individual session checks.
+**One amount. Many ways to see it.**
 
-![Summit's alpine island artwork](web/public/art/summit-island.png)
+In **Fraction Peaks**, turn a fraction symbol, a shaded model, and a number line until they agree. Light the beacon, climb the mountain, and use Pip's visual hints to see why the values match.
 
-This repository is prepared for local evaluation and development. It has one synthetic learner and no authentication. **It is not ready to expose as a public service.** Its journal reports observed practice; it does not establish lasting mastery or measured learning gains.
+[Run locally](#run) · [Walk through the product](docs/PRODUCT-WALKTHROUGH.md) · [Explore the architecture](docs/ARCHITECTURE.md)
 
-## Run locally
+<img src="docs/images/fraction-peaks.png" width="760" alt="Fraction Peaks: a target of one half above a three-layer tower, with fraction, shaded model, number-line controls, and Pip's hint panel.">
 
-Install **Node.js 24 or newer** and npm. The included `.nvmrc` selects Node 24 for compatible version managers. From this repository's root:
+**A welcoming way back.** After five days away, an optional comeback step offers arithmetic practice one level lower, keeps the learner's history, and uses an available streak freeze to preserve their streak. Returning becomes a clear next step in the adventure.
+
+## Run
+
+**Node.js 24 or newer is required.** From the repository root:
 
 ```sh
 npm ci
@@ -16,85 +20,45 @@ npm run build
 npm start
 ```
 
-Open **http://127.0.0.1:3001** on the same computer. The server serves the built browser app and creates its local SQLite database automatically. No separate database installation, account, or AI key is needed. The server binds to the loopback interface by default.
+Open **http://127.0.0.1:3001**, choose **Let's climb**, and play. SQLite is built into Node 24; no separate database, account, or AI key is needed. The local server creates the synthetic demo profile automatically.
 
-The first dependency installation needs npm-registry access unless the pinned packages are already cached. Keep development dependencies installed: the local server uses `tsx` to execute its TypeScript source. `npm ci --omit=dev` is not the supported startup recipe.
+For development, run `npm run dev` and open **http://127.0.0.1:5174**. The included `.nvmrc` selects Node 24. Keep development dependencies installed: the server runs TypeScript through `tsx`. More setup and API details are in the [server guide](server/README.md).
 
-For development with automatic reload:
+## A climb worth exploring
 
-```sh
-npm run dev
-```
+- **Fraction Peaks:** three towers connect equivalent fractions across symbols, same-size shaded wholes, and number lines. A subdivision scaffold makes the unchanged amount visible. Two session checks follow.
+- **Comeback:** choose a gentler arithmetic starting level after a break. The adjustment never goes below level 1, preserves past results, and can use one available streak freeze.
+- **Seven arithmetic trails:** seven distinct questions, three hearts, and a two-minute bonus window. A third incorrect answer ends the round; losing hearts never lowers a practice level. Completing all seven answers with a heart remaining before the window closes earns a 50-point bonus. When the window closes, play continues while hearts remain.
+- **Four story worlds:** space, ocean, dinosaurs, and animals turn a single arithmetic problem into a small story. These rounds have no timer or hearts.
+- **Field journal:** completed practice, first-attempt checks without hints, and supported work stay distinct. Save or resume a fraction climb and export the session record.
+- **Comfort controls:** keyboard and touch controls, optional sound, motion and contrast settings, and browser read-aloud where available. Fraction Peaks stays untimed and heart-free.
 
-Open **http://127.0.0.1:5174**. Vite forwards API requests to port 3001. Stop other local copies if a required port is in use. Neither address is a public deployment link.
-
-## Play and inspect
-
-- **Fraction Peaks:** three authored towers connect equivalent fractions to continuous shaded models and number-line positions, followed by two individual session checks.
-- **Pip's support:** deterministic strategies target the first mismatched representation; a subdivision scaffold preserves the whole and shaded amount while changing the pieces.
-- **Seven arithmetic trails:** ten game levels each, seven distinct problems per round, server-owned answer checking and scoring, and persisted hint use. There is no countdown or lost-heart failure.
-- **Four story worlds:** space, ocean, dinosaur, and animal stories work with authored fallback content. Optional live AI can frame arithmetic stories, hints, and parent guidance.
-- **A field journal:** fraction practice, first-attempt checks without help, and supported items remain distinct. Arithmetic counts appear separately. JSON export includes a selectable-text fallback.
-- **Comfort controls:** keyboard and touch controls, browser read-aloud where available, opt-in sound, motion/contrast settings, and browser-local fraction save/resume.
-
-See the [product walkthrough](docs/PRODUCT-WALKTHROUGH.md) for a guided inspection.
-
-## Optional live AI
-
-AI starts **off** for the synthetic demo learner. The fraction coach is authored code and does not call a model.
-
-1. Copy `.env.example` to `.env` and add your own `ANTHROPIC_API_KEY` privately. The example uses the configured model alias `claude-sonnet-4-5`; `AI_MODEL` can select another compatible available Anthropic model.
-2. Restart the server.
-3. Open **For grown-ups → Optional AI features → Enable AI**.
-4. Create a story and inspect its source badge: **AI STORY · CHECKED** means the response passed the implemented checks; **OFFLINE STORY** means the authored fallback was displayed.
-
-The server can instead load a private environment file referenced by `SUMMIT_ENV_FILE`. Existing process environment values take precedence. Never put credentials in browser code or commit `.env`.
-
-The model supplies text. Code generates the arithmetic, checks submitted answers, and computes scores, progress, and evidence totals. Consent gates every live model route. Provider failures, an eight-second timeout, or failed numeric/format checks lead to authored fallback content. These checks do not prove the meaning or child suitability of arbitrary generated text. A historical single-request live smoke test is described in [QA.md](QA.md); the automated checks do not make model calls.
-
-## Architecture and recorded evidence
-
-The project uses npm workspaces:
-
-- `web/`: React and TypeScript with Vite. Fraction content, exact equivalence checks, and session summaries run in the browser. Completed fraction sessions and an unfinished climb are stored in local browser storage.
-- `server/`: Express and TypeScript. Node's built-in SQLite stores arithmetic rounds, problems, hint state, assessed results, game progression, and events. Opaque problem IDs and transactional submissions prevent duplicate progress awards.
-- `server/src/ai/`: one optional Anthropic adapter plus authored fallback text and provenance checks.
-
-The seven-day arithmetic report counts logged answers, correct answers, hint use, completed rounds, and level unlocks. Fraction records contain item ID/type, correctness, whether help was used, and attempt count, summarized once per item. These stores are separate and do not synchronize across devices.
-
-No learning-gain study, delayed retention measurement, A/B experiment, or centralized analytics service is implemented. Arithmetic elapsed time is wall-clock round duration, capped at one hour, and can include time away from the page. See the [architecture](docs/ARCHITECTURE.md) and [server contracts](server/README.md) for details.
+The bonus is determined when the last answer is assessed, so taking time to read the results or press Finish does not lose an earned bonus. The [product walkthrough](docs/PRODUCT-WALKTHROUGH.md) explains the flow and the choices behind it.
 
 ## Verify
 
 ```sh
+npm run check:repo
 npm test
 npm run typecheck
 npm run eval
 npm run build
 ```
 
-The recorded checks pass **66 tests** (56 server and 10 fraction) and **17,952 deterministic evaluation checks**. They test arithmetic/content integrity, API assessment rules, consent and fallback behavior, and evidence summaries—not educational effectiveness.
+The **Verify Summit** workflow runs these checks on Node 24. See the [current verification record](docs/QA.md) for results, scenarios, and remaining coverage. These commands check software behavior and content rules; learner outcomes need a separate study.
 
-The **Verify Summit** workflow runs a fresh dependency install and those commands on Node 24 for pushes and pull requests. Local checks have been run; a hosted GitHub Actions result exists only after the workflow is uploaded and executes. See [QA.md](QA.md) for the exact verification record and limits.
+## AI, evidence, and release scope
 
-## Prototype boundaries
+Pip's fraction strategies are authored and deterministic. Optional Anthropic calls add arithmetic stories, hints, and parent guidance; code owns answers, hint state, scores, and progression. Story provenance identifies model output or authored fallback. Numeric and format checks bound the output, but cannot establish every story's meaning or suitability.
 
-This is a single-learner local demo. It has no account/guardian authentication, multi-user authorization, production rate limits, or public hosting. Administrative reset, event, and demo-clock routes are unauthenticated. The consent switch is a setting for a synthetic profile, not verification of a guardian's identity. Additional work is required before any public exposure or real learner use.
+To try live AI, copy `.env.example` to a private `.env`, add your own `ANTHROPIC_API_KEY`, restart, and enable **For grown-ups → Optional AI features**. AI starts off. Missing access, provider failure, timeout, or rejected output uses authored content. Keep real keys out of Git and browser code; the example model alias is `claude-sonnet-4-5`.
 
-The three fraction towers and two checks repeat across climbs. First-attempt success without recorded help describes that session; it does not establish unseen transfer on later replays, retention, or lasting mastery. Game levels follow a progression rule. The inherited comeback rule optionally lowers practice levels after a quiet stretch; it is not a validated retention intervention.
+This release runs locally with one synthetic learner. Accounts, guardian verification, shared storage, and protected administration are needed before public multiuser use. Fraction checks repeat across climbs: the journal describes the current session, without claiming lasting mastery. The comeback rule is a product choice whose effect on return behavior and learning has not yet been measured. [Architecture](docs/ARCHITECTURE.md) and [QA](docs/QA.md) describe the practical limits.
 
-Browser speech varies by platform. Google Fonts are requested when available, with system-font fallback. Full assistive-technology user testing has not been performed.
+## Built with AI, directed by a person
 
-## Attribution and repository contents
+> I built the foundation with Claude, then iterated with Codex. AI coding tools did most of the typing; the product decisions, the thesis, and the review were mine.
 
-This iteration extends a supplied Summit prototype. The [development record](docs/DEVELOPMENT-RECORD.md) distinguishes inherited work from new changes and assistance. An open-source license for the entrant's own work has **not** been selected; see [LICENSE-NOTICE.md](LICENSE-NOTICE.md).
+The alpine scenery was generated with an AI image tool; the tower, Pip, icons, and mathematical models use SVG/CSS/React. The [development record](docs/DEVELOPMENT-RECORD.md), [AI/material disclosure](docs/DISCLOSURES.md), and [artwork record](docs/ARTWORK.md) make those contributions explicit.
 
-- [Materials and AI disclosure](DISCLOSURES.md)
-- [Artwork generation record](ARTWORK.md)
-- [Package versions and declared licenses](DEPENDENCIES.md)
-- [Collected package license texts](THIRD_PARTY_NOTICES.txt)
-- [Dependency sources](docs/materials/dependency-inventory-with-sources.md)
-- [Supplemental notices and unresolved license-text limits](docs/materials/supplemental-license-notices.txt)
-- [Challenge context and demonstration plan](HACKATHON.md)
-
-The uploadable source excludes installed dependencies, compiled browser output, runtime databases, private configuration, personal/interview documents, and recording binaries. Build artifacts are generated locally or by CI. No repository has been published by preparing this folder.
+The project uses the [MIT License](LICENSE). Third-party materials retain their own terms; see [licensing](docs/LICENSING.md), the [dependency inventory](docs/DEPENDENCIES.md), and [package notices](docs/materials/THIRD_PARTY_NOTICES.txt). The [challenge guide](docs/HACKATHON.md) keeps submission context separate from the product walkthrough.

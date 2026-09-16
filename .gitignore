@@ -1,0 +1,23 @@
+# Installed dependencies and generated artifacts
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+*.log
+
+# Private configuration; retain only the public example
+.env
+.env.*
+!.env.example
+
+# Local demo data
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# OS metadata
+.DS_Store
+Thumbs.db

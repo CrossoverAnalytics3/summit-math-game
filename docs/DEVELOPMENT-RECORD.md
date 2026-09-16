@@ -1,78 +1,44 @@
-# SUMMIT — development in this iteration
+# Summit development record
 
-This statement distinguishes the supplied starting project from work evidenced in the current development session. It is a technical change record, not a certification of the entrant's ownership, eligibility, or earlier project history.
+## Authorship and tools
 
-The official entry window is August 27–September 18, 2026. The session's build, artwork, and verification records identify September 15, 2026; the submission audit was performed September 16, 2026 UTC. These records document this iteration. They do not establish when the supplied prototype was first authored or who contributed to it. [Official rules, §4.4](https://hackathon.nerdy.com/terms#:~:text=New%20or%20substantially%20updated%20work.)
+> I built the foundation with Claude, then iterated with Codex. AI coding tools did most of the typing; the product decisions, the thesis, and the review were mine.
 
-## Starting point
+This is the creator's description of the work. Claude assisted with the foundation; Codex and assisting agents contributed implementation, research, tests, review, documentation, and demonstration production in the subsequent iteration. The mountain scenery came from an AI image-generation tool. [Disclosures](DISCLOSURES.md) and the [artwork record](ARTWORK.md) describe the material and tool contributions.
 
-The supplied Summit folder already contained:
+## Foundation
 
-- A React/TypeScript interface and an Express service.
-- Seven arithmetic generators and ten-level progression.
-- Comeback/streak behavior, event logging, and a story rollout flag.
-- An Anthropic/stub adapter with story, hint, and parent-note tasks.
-- Numeric/format checks and authored fallback content.
-- A 43-test baseline suite.
+The starting Summit project supplied React/TypeScript, an Express service, seven arithmetic generators, ten practice levels, comeback/streak logic, event logging, an Anthropic/stub adapter, authored fallback stories and guidance, and a baseline test suite. That foundation supported the subsequent product work.
 
-Those capabilities were extended in this iteration. The entire product, arithmetic foundation, and model integration should not be described as having been created from scratch during this session.
+The inspected starting folders contained no Git history. This record identifies the implemented changes without inventing an earlier creation date. The hackathon's entry-period requirements are linked in the [challenge guide](HACKATHON.md).
 
-## Audited comparison
+## Fraction Peaks and the alpine experience
 
-The technical comparison between the supplied folder and the upgraded application found **21 added files, 16 changed files, six unchanged files, and no removed files**, excluding lockfiles and generated build outputs. This is the application snapshot audited before preparation of this submission packet; separate video and packet artifacts are not included in those counts.
-
-All **43 original tests remain unchanged, byte for byte**. The unchanged files are:
-
-- `server/src/events.ts`
-- `server/src/flags.ts`
-- `server/test/summit.test.ts`
-- `server/tsconfig.json`
-- `web/package.json`
-- `web/tsconfig.json`
-
-## Work added or substantially changed
-
-| Area | Change evidenced in this iteration |
+| Area | Work in the Codex iteration |
 |---|---|
-| Visual experience | Alpine art direction, an original generated mountain scene, responsive interface, dimensional towers, Pip, and beacon feedback. |
-| Fraction learning route | Three authored towers connect symbols, continuous shaded models, and number-line positions. Two individual session checks follow. |
-| Learning support | Deterministic hints target the first mismatched representation. Subdivision preserves the whole and shaded amount. Hints and retries remain distinct in the evidence. |
-| Progress record | Browser-local fraction save/resume, a field journal, separate arithmetic logs, JSON export, and a selectable-text fallback. |
-| Arithmetic interface | Seven-question practice routes without a countdown or lost-heart failure. Rounds use distinct problems. |
-| Assessment integrity | Server-stored problem identifiers, code-owned grading and scores, persistent hint state, idempotent answer/finish requests, and no upfront answer array. |
-| Progression and content | Corrected an addition-generation boundary and prevented old-difficulty questions from repeatedly unlocking higher levels. |
-| Optional AI | Broader consent gating, default AI-off behavior, an implemented eight-second provider timeout, parent names excluded from prompts, meaningful themed fallbacks, and clearer source labels. |
-| Local runtime | Node 24 built-in SQLite, a single-port production app, loopback default binding, and documented startup instructions. |
-| Comfort and access | Named settings/dialogs, reduced motion, extra contrast, optional game sound, browser read-aloud, and touch/keyboard button controls. |
-| Verification and disclosure | Additional API and fraction tests, a deterministic evaluation runner, a QA record, setup guidance, material inventory, and artwork provenance. |
-| Submission demonstration | A 2:52 edited recording of actual interactions, narrative captions, an original synthesized instrumental score, a matching transcript, and production notes. |
+| Product experience | An alpine visual world, responsive layouts, dimensional tower, Pip, beacon feedback, and comfort settings. |
+| Fraction mechanic | Three authored towers connect a numeric fraction, a shaded same-size whole, and a number line. Two session checks follow. |
+| Support | Strategies target the first mismatched representation. Subdivision changes the parts while preserving the whole and shaded amount. |
+| Evidence | Browser-local save/resume, a field journal, separate arithmetic facts, JSON export, and a selectable-text fallback. |
+| Arithmetic integrity | Server-owned problem IDs, answer assessment, hint state, score, and idempotent answer/finish requests; distinct-question rounds and progression fixes. |
+| AI boundary | Default-off live AI, consent gating across model routes, an eight-second timeout, themed authored fallback, and visible provenance. |
+| Local delivery | Node 24 built-in SQLite, one-process serving of the built app, loopback default binding, and reproducible setup. |
+| Verification | API and fraction checks, deterministic content evaluation, type/build checks, and recorded desktop/mobile walkthroughs. |
 
-## How the work was directed
+The fraction coach is authored code. Runtime AI supplies optional arithmetic stories, hints, and parent guidance; code controls mathematical assessment and evidence totals.
 
-I directed this iteration with generative AI assistance, starting from an existing supplied prototype. Codex and assisting agents contributed research, product decisions, implementation, generated artwork, testing, review, documentation, and demonstration production. This statement does not attribute earlier human work to the entrant or establish rights to the supplied baseline. The entrant should confirm that the contribution description accurately reflects their direction and involvement before submitting.
+## Restored trail challenge and clearer comeback positioning
 
-The optional runtime provider is Anthropic through its Messages API. The configured model identifier is `claude-sonnet-4-5`; it is an alias, not a verified dated model snapshot. Runtime AI frames arithmetic stories and provides optional arithmetic hints and parent guidance. Fraction feedback, arithmetic assessment, scores, progression, and evidence totals are controlled by code.
+The current revision brings three hearts back to standard arithmetic trails. A third incorrect answer ends the round; neither a lost heart nor the end of that round lowers a level or removes history. The 120-second clock is a bonus window: completing all seven answers with a heart remaining before it closes adds 50 points, while expiry alone allows play to continue. The server uses the final assessment time rather than the Finish click. Story rounds stay untimed and heart-free, and Fraction Peaks keeps its untimed practice loop.
 
-## Verification supported by the session record
+The optional comeback remains a separate action after five days away. It lowers arithmetic practice levels by one, with level 1 as the floor, clears the consecutive-answer run, and preserves historical records. An available streak freeze can preserve the daily streak once. This is a designed return path, with effects on retention and learning still to evaluate.
 
-- **66 automated tests passed:** 56 server tests, including the 43 preserved baseline tests, plus 10 new fraction-content/evidence tests.
-- **17,952 deterministic checks passed:** 17,920 generated arithmetic cases and 32 fallback/constraint checks.
-- Distinct seven-problem rounds were checked across 560 skill/level/seed scenarios.
-- Browser/server type checking and a production browser build passed.
-- Desktop and phone walkthroughs exercised the fraction route, support, resume, reporting, export fallback, arithmetic, and story content.
-- The recorded fraction demonstration completed three towers, two checks correctly on first attempts without hints, and one tower with support.
-- The final video shows a real Anthropic-generated story, its provenance, and a server-assessed answer. An earlier request used the authored fallback; the successful take is the one shown.
+The server also supports recovery of an existing round after reload or a failed finish request. Saved rounds from the earlier format retain their original untimed, heart-free behavior. See the [server contract](../server/README.md) for the exact state and compatibility rules.
 
-Provider-failure fallback was tested. An eight-second timeout is implemented, but the automated suite did not directly exercise an elapsed timeout or aborted provider request. These checks do not measure educational effectiveness, arbitrary model semantics, full assistive-technology compatibility, or production security.
+## Verification and delivery evidence
 
-## Earlier history still requiring confirmation
+Run the commands in the [README](../README.md#verify) and consult [QA](QA.md) for the current results. Keeping totals there avoids describing an older test count as the latest release's coverage.
 
-No Git history was present in either compared project directory. File existence and copied timestamps cannot establish original authorship, dates, contributor rights, or prior AI use. The entrant still needs to confirm:
+Earlier recorded UI demonstrations show the fraction route, assistance, session checks, journal, arithmetic story provenance, and a server-assessed answer. Individual live Anthropic responses and an authored fallback were observed. These are bounded integration observations, not a reliability benchmark or a learner study. The recordings predate the restored standard-trail hearts/bonus revision; they do not demonstrate that new contract.
 
-- When and by whom the supplied prototype was developed.
-- What human and AI assistance contributed before this session.
-- Rights to the baseline and any earlier incorporated material.
-- Whether any earlier development or testing involved real learner data.
-- Whether employment, consulting, funding, or other agreements affect submission rights.
-
-No earlier creation date or ownership history is invented here. The comparison establishes concrete changes in this iteration; it does not resolve those personal and historical facts.
+No learner study, measured learning gain, delayed-retention result, or public production launch is claimed by this record. The [product walkthrough](PRODUCT-WALKTHROUGH.md) connects the implemented decisions to the next discovery and evaluation steps.

@@ -1,112 +1,97 @@
 # Summit product walkthrough
 
-Summit turns equivalent fractions into a small mountain expedition. The learner aligns a symbol, a picture, and a number-line point to represent the same amount, gets help when needed, and finishes with two session checks. Seven arithmetic trails and optional themed stories extend the supplied project.
+**Fraction Peaks makes the relationship the game mechanic.** The learner turns a fraction symbol, a shaded model, and a number line until they name the same amount. Connecting the representations lights a beacon and advances the mountain expedition.
 
-This guide follows the product work from defining a problem through measuring and improving the result. It describes the implemented prototype and identifies hypotheses that still need testing.
+The second product idea is a welcoming return. Summit offers a clear comeback step after time away, preserving the learner's history while easing the arithmetic starting point. Together, these choices make the product about seeing a connection and finding the next manageable step.
 
-## 1. Define the problem and success
+## 1. Make equivalent value visible
 
-The design problem is concrete: can a game make the relationship between equivalent fractions visible through its actions? A learner may recognize `1/2` without connecting it to `3/6` shaded on a same-size whole or `4/8` on a number line. Summit asks for those connections in one central object.
+From the home screen, **Let's climb** opens or resumes Fraction Peaks. Each tower has a target and three layers:
 
-The featured route is deliberately narrow: three Grade 4 practice towers, followed by two one-answer session checks. It is not a complete K–5 curriculum. The broader arithmetic trails preserve the starting project's seven skills and ten game levels.
-
-**Current success criteria are functional:** each representation can be manipulated, equivalence is checked exactly, feedback points to a mismatch, help changes the visual explanation, and the journal describes the learner's actual actions. Those behaviors have recorded engineering and browser verification.
-
-**The learning hypothesis remains unproven:** using the same amount in several forms may help learners explain equivalence and apply it to new examples. A completed tower or two correct answers does not establish that outcome. Alternate items, delayed checks, and consented learner observation are future work.
-
-## 2. Build the learning interaction
-
-### The fraction climb
-
-From the alpine home, **Let's climb** opens or resumes Fraction Peaks. Each practice tower has three layers with arrow controls:
-
-1. A fraction symbol.
-2. Equal parts of a shaded, same-size whole.
+1. A numeric fraction.
+2. Equal parts of a same-size shaded whole.
 3. A point on a number line from zero to one.
 
-All three must equal the target before the beacon lights. The targets are one half, one quarter, and three quarters. The tower uses CSS dimensional styling and SVG mathematical models; its choices are authored, finite content.
+Every layer must equal the target before the beacon lights. The three targets are one half, one quarter, and three quarters. The controls, dimensional tower, and SVG models make each representation directly inspectable.
 
-An incorrect match gives a strategy for the first mismatched representation and allows another try. **Give me a little nudge** opens a scaffold. Splitting every piece in two changes both numerator and denominator while preserving the whole and continuous shaded amount. The learner can see what changed and what stayed the same.
+A mismatch prompts a strategy aimed at the first incorrect layer. **Give me a little nudge** opens a visual scaffold; splitting each piece in two changes the numerator and denominator while the whole and shaded amount stay fixed. This route is untimed and heart-free, leaving room to explore the model.
 
-The route then presents checks for two thirds and one third. Each accepts one answer, locks the response, and explains the result. Help is available and recorded. The journal counts a check as independent only when it was correct on the first attempt without help. The same questions repeat on later sessions, so the interface explicitly avoids a retention or mastery claim.
+Two individual checks follow, using two thirds and one third. Each accepts one answer and explains the result. The journal distinguishes completed towers, checks correct on the first attempt without help, and supported work. The same checks repeat on later climbs, so they describe the current session.
 
-### Decisions and tradeoffs
+### The product hypothesis
 
-| Decision | Why it matters | Current tradeoff |
-| --- | --- | --- |
-| Make matching equivalent amounts the central action | The game action carries the mathematical idea. | Three authored towers allow careful review but limited content coverage. |
-| Separate practice, help, and first-attempt checks | The journal can explain what happened instead of inflating a completion score into a learning claim. | Two repeated checks are a narrow session signal. |
-| Use deterministic math and optional AI language | Answers, equivalence, score, and progression do not depend on model judgment. | Text constraints catch some failures; they do not establish semantic correctness or suitability. |
-| Remove countdown and lost-heart mechanics | The interface leaves room to inspect and retry a representation. | The intended effect on comfort or learning has not been measured. Arithmetic still awards fewer points after a hint. |
-| Preserve and export the session | Reloading can resume a fraction climb; the journal makes the evidence inspectable. | Fraction data stays in one browser; arithmetic data stays on the local server. |
+A learner can choose a correct fraction answer without connecting the notation to the amount. Summit explores whether linking representations through one repeated action can help make that relationship understandable. This is a design hypothesis informed by the challenge, visual references, and public learning guidance; it has not yet been established through Summit customer or learner research.
 
-### Arithmetic and stories
+The release's functional criteria are concrete: representations can be changed, equivalence is assessed exactly, feedback identifies a mismatch, the scaffold preserves the amount, and the journal reflects the actions taken. Transfer and retention require separate learning evidence.
 
-The home also offers seven arithmetic trails. A standard round contains seven distinct problems at the learner's current game level. The server owns the problems, answers, hint state, score, and completion. Each problem has one assessed response; an incorrect answer reveals the expected answer and guidance before the next problem.
+## 2. Make returning a clear next step
 
-Story mode offers space, ocean, dinosaurs, or animals and creates a one-problem round. With optional AI enabled and a configured provider, the model can write the framing. Otherwise, built-in stories keep the local game usable. The screen identifies the actual source and exposes the checks applied. The fraction coach always uses authored strategies.
+After five days away, the optional comeback action offers arithmetic practice one level lower, with level 1 as the floor. It keeps past results, clears the current consecutive-answer run, and can spend one available streak freeze to preserve the daily streak. The level adjustment is explicit and chosen; it is separate from losing a heart during a round.
 
-Motion and contrast preferences, optional sound, browser read-aloud, named dialogs, and touch/keyboard controls support the experience. These features have implementation and browser checks; they have not undergone a full assistive-technology study.
+The intent is to offer a manageable return instead of making the learner reconstruct where to begin. Whether that choice improves return rates, confidence, or learning is a question for the next evaluation. Existing history is evidence to preserve, not a reason to claim a measured retention benefit.
 
-### What existed and what this version adds
+## 3. Add challenge where it fits
 
-The supplied Summit baseline already had the React/TypeScript and Express structure, arithmetic generators, progression, comeback/streak logic, events, story rollout, model adapters and fallback templates, and 43 tests.
+| Route | Interaction | Feedback and progression |
+|---|---|---|
+| Fraction Peaks | Three practice towers, then two session checks; untimed, no hearts. | Targeted authored help, visual subdivision, beacon progress, and recorded support. |
+| Arithmetic trails | Seven distinct questions, three hearts, and a 120-second bonus window. | The third wrong answer ends the round. Correct answers earn points; hints are recorded. Completing all seven answers with a heart remaining before the window closes adds 50 points. Timer expiry alone does not end play. |
+| Story worlds | One arithmetic problem framed in space, ocean, dinosaurs, or animals; untimed, no hearts. | The source is visible, code assesses the answer, and optional model text has an authored fallback. |
 
-This version adds the alpine visual system and generated hero artwork; fraction towers, scaffold, session evidence, resume and export; revised arithmetic presentation; distinct-question rounds and stronger server-owned assessment; consent gating and clearer AI provenance; and additional tests and packaging. Codex and assisting agents contributed research, design, implementation, testing, artwork, and documentation. See [materials and AI disclosure](../DISCLOSURES.md) and [artwork provenance](../ARTWORK.md).
+An arithmetic answer earns 100 points when correct without a hint, 60 when correct after a hint, and zero when incorrect. The bonus uses the last answer's assessment time, so a learner can read the feedback before pressing Finish. Losing hearts never lowers a level or removes history. Three consecutive unhinted correct answers at the current difficulty advance the game level; these are game rules, not a validated mastery model.
 
-## 3. Ship a reviewable experience
+The server stores round state and prevents duplicate answer or finish requests from awarding progress again. Recovery allows an existing arithmetic round to be retrieved after reload or an interrupted finish request. Earlier saved rounds retain their original untimed, heart-free contract.
 
-The app runs locally on Node 24. A production browser build can be served by the same Express process as the API. Follow the [repository setup instructions](../README.md); the game does not require an AI key, although the local server is still required. This is not an installed offline/PWA product or a deployed multi-user service.
+### Decisions worth defending
 
-The seeded profile is synthetic. AI is off by default. The grown-up setting demonstrates consent state but does not verify guardian identity. There is no authentication, cross-device synchronization, or production authorization. See [architecture and boundaries](ARCHITECTURE.md).
+| Decision | What it makes possible | Tradeoff to evaluate |
+|---|---|---|
+| Make equivalent representations the game action | A visible connection between interaction and mathematical meaning. | A small authored item bank limits coverage and replay interpretation. |
+| Keep support visible in the journal | Adults can distinguish completion, assistance, and first attempts. | Session evidence does not establish independent transfer or retention. |
+| Give comeback its own optional action | A clear, transparent starting point after a break. | The one-level adjustment may help some learners and feel unnecessary to others. |
+| Separate a bonus window from round failure | Arithmetic can offer pace and stakes while allowing play after the timer expires. | Hearts and hint-point differences need observation for their effect on help-seeking and comfort. |
+| Use deterministic assessment and optional AI language | The game works without a provider, and math rules are inspectable. | Numeric constraints alone cannot evaluate every generated meaning. |
 
-### Five-minute product demonstration
+Motion and contrast preferences, optional sound, browser read-aloud, and touch/keyboard controls support different preferences. Fraction sessions save locally and can be resumed. The journal exports JSON and exposes selectable text as a download fallback.
 
-This walkthrough is for a live review. It is separate from the shorter submission video. Use a fresh browser fraction session for the stated sequence, or explain the actual resumed state.
+## 4. Walk through the product
 
-| Time | Action | Point to make |
-| --- | --- | --- |
-| 0:00–0:30 | Home → **Let's climb** | One focused learning objective in a visually coherent game. |
-| 0:30–1:40 | Set the half tower's symbol to `2/4`, leave a picture incorrect, and submit. Request a nudge and split the pieces. Finish with picture `3/6` and number line `4/8`. | The feedback addresses a representation; subdivision preserves the amount. Help will appear in the evidence. |
-| 1:40–2:25 | Complete the quarter tower with `2/8`, `3/12`, `1/4`; then the three-quarter tower with `6/8`, `9/12`, `3/4`. | These are authored choices across the same three representations. |
-| 2:25–3:00 | Answer the checks with `4/6` for `2/3`, then `4/12` for `1/3`, without help. | One answer per check. These are session observations, and the items repeat on replay. |
-| 3:00–3:35 | Open the journal and download/export dialog. | This exact run should show three towers, two correct unassisted checks, and one supported item. Describe the displayed counts if your actions differ. |
-| 3:35–4:25 | Choose a story world, open provenance, answer the current problem, and finish. | Read the actual AI/offline source label. The operands vary; code supplies and assesses the math. |
-| 4:25–4:45 | Start an ordinary arithmetic trail and show its seven-stop counter and a hint. | Demonstrate one problem; a full round need not fit this interval. |
-| 4:45–5:00 | Show motion/contrast settings and name the next priorities. | The prototype is complete enough to inspect, with explicit scope and evidence limits. |
+This five-minute outline is for a live product review. The submission video has its own shorter plan in the [challenge guide](HACKATHON.md).
 
-If a live provider is used, configure it privately and enable the demo consent setting before that portion. A fallback is a valid result to demonstrate; do not describe an offline story as freshly generated AI.
+| Time | Show | Explain |
+|---|---|---|
+| 0:00–0:25 | Home → Fraction Peaks | One concept and one central interaction. |
+| 0:25–1:25 | Set the half tower's symbol to `2/4`, leave the picture wrong, and submit. Open the nudge and split the pieces. Finish with picture `3/6` and line `4/8`. | Pip's authored strategy targets the mismatch; the amount stays fixed during subdivision. |
+| 1:25–2:15 | Complete the remaining towers and two checks, then open the journal. | Explain the displayed counts and the difference between help, practice, and first attempts. |
+| 2:15–2:50 | Show comeback when the demo profile is eligible. | Five days away, optional one-level adjustment, preserved history, and the available streak freeze. State clearly if a demonstration clock was used. |
+| 2:50–3:35 | Start a standard arithmetic trail. Show hearts, the bonus window, and a hint. | Time expiry leaves play available; a third wrong answer ends the round without lowering a level. |
+| 3:35–4:25 | Open a story world and inspect the actual provenance. Answer the displayed problem. | Stories have no timer or hearts. The text source can vary; assessment belongs to code. |
+| 4:25–5:00 | Show verification commands and name the next experiment. | Distinguish tested software behavior from learning evidence still to collect. |
 
-### Failure behavior is part of the product
+Do not describe a fallback story as freshly generated AI. Use the actual journal state if the demonstration differs from the planned sequence. Existing recordings predate the restored standard-trail hearts and bonus; record that interaction again if the new behavior is part of the claim.
 
-- A wrong tower match produces targeted feedback and permits practice; a later success after a retry is recorded as supported.
-- Reloading an unfinished fraction climb resumes it in the same browser when storage is available.
-- Duplicate arithmetic answer or completion requests return the original result without awarding progress again.
-- Missing, failed, or rejected model output falls back to authored content with the actual source shown.
-- An empty journal says there are no results. An unavailable arithmetic report offers a retry.
-- Export prepares a JSON file and also exposes selectable text when the browser does not save it. External-browser file saving was not independently verified.
+## 5. Measure and iterate
 
-## 4. Measure what the product actually records
+Arithmetic events and round state are stored in local SQLite; fraction sessions are stored in the current browser. They support inspection of a demonstration, rather than a unified production analytics system.
 
-The latest fraction session appears separately from the arithmetic seven-day log. The export contains stored fraction sessions, currently available arithmetic facts, and guidance provenance. It is an inspectable demo record, not a school record or validated assessment.
+| Signal | What it currently means | Next measurement |
+|---|---|---|
+| Fraction correctness, help, and attempts | Actions during each authored item in the current session. | Unseen items, representation-specific errors, and a delayed check. |
+| Arithmetic answers, hints, rounds, and levels | Practice activity and game progression. | Difficulty-aware performance and effects of hearts/bonus on completion and help use. |
+| Comeback action and subsequent activity | A recorded choice to adjust practice after a break. | Whether learners return, continue, and find the starting level appropriate. |
+| Round elapsed time | Wall time, including time away from the page. | Durable interaction timing and a defined completion funnel. |
+| AI source and applied checks | How a displayed response was produced and screened. | Semantic review, fallback reasons, latency, cost, and suitability. |
 
-| Available now | Appropriate interpretation | Proposed measurement, not yet established |
-| --- | --- | --- |
-| Fraction item, correctness, assistance, attempts | What happened during practice and each check in that session | Alternate unseen items, representation-specific errors, delayed checks |
-| Arithmetic attempts, correct answers, hints, levels, rounds | Practice activity and game progression | Difficulty-aware transfer and a defined learning assessment |
-| Round start-to-finish elapsed seconds | Wall time, including idle time | Interaction-based duration and an instrumented completion funnel |
-| Provider, prompt version, field names, checks, final source | How one displayed response was produced | Aggregate fallback reasons, latency percentiles, cost, semantic/suitability review |
-| Browser and control verification | Whether the checked flows worked | Consented learner/guardian usability and assistive-technology testing |
+Use [QA](QA.md) for the current verification record and run the [repository checks](../README.md#verify). Test totals and a polished demonstration describe software behavior; they do not establish learning gains.
 
-Recorded verification includes 66 tests, 17,952 deterministic offline checks, 560 distinct-round scenarios, type checking, a production build, and desktop and phone play-throughs. These establish bounded engineering evidence. They do not demonstrate learning gains, retention, child engagement, or broad model reliability. See the [verification record](../QA.md) for the tested scenarios and limits.
+Next, speak with tutors and parents to test the assumed fraction and reporting problems. Then observe learners with appropriate consent, expand the unseen item pool, and evaluate independent transfer and delayed understanding. For comeback and arithmetic challenge, observe comfort, help-seeking, and return behavior before assuming the mechanics improve engagement or retention.
 
-## 5. Iterate on the riskiest assumptions
+## 6. Boundaries and provenance
 
-Begin with tutor and parent conversations to test whether the assumed fraction difficulty and reporting need are the right problems. Use those findings to define the next study and its success criteria; no such customer discovery has been completed for Summit yet.
+The fraction coach is authored and deterministic. Optional Anthropic output frames arithmetic stories, hints, and parent guidance; code owns assessment, hint state, scores, and progression. Missing access, failed requests, timeout, or rejected output produces authored content. Numeric and format checks do not establish all aspects of meaning or child suitability.
 
-1. **Broaden the evidence before the claim.** Add parallel fraction items and representation-level error recording. Test delayed performance before suggesting retention or mastery.
-2. **Observe the learner.** With appropriate consent, test whether children understand the task, notice the invariant, and use help comfortably. Investigate whether arithmetic's hint-point difference discourages help.
-3. **Evaluate generated language.** Review semantic operation match, written-out answer leaks, suitability, fallback reasons, latency, and cost. Keep deterministic fallback available.
-4. **Prepare real deployment boundaries.** Replace the synthetic identity, restrict demo administration routes, define consent and retention, and design authorized shared storage before a multi-user release.
+The local release uses one synthetic learner, without authenticated accounts, guardian identity verification, shared storage, or protected administration. Real deployment requires those controls. Browser-local records can be edited or cleared, the two fraction checks repeat, and full assistive-technology testing is still outstanding. See [architecture](ARCHITECTURE.md) and [QA](QA.md).
 
-The next decision should follow those observations, rather than adding more effects or claiming success from a completed demo.
+> I built the foundation with Claude, then iterated with Codex. AI coding tools did most of the typing; the product decisions, the thesis, and the review were mine.
+
+The [development record](DEVELOPMENT-RECORD.md), [material disclosure](DISCLOSURES.md), and [artwork provenance](ARTWORK.md) document the contributions. Start the app with the [README](../README.md).

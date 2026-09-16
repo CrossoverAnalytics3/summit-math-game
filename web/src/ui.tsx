@@ -21,6 +21,8 @@ export type IconName =
   | "home"
   | "download"
   | "play"
+  | "heart"
+  | "clock"
   | "refresh";
 const paths: Record<IconName, ReactNode> = {
   mountain: (
@@ -109,6 +111,8 @@ const paths: Record<IconName, ReactNode> = {
     </>
   ),
   play: <path d="m8 4 12 8-12 8Z" />,
+  heart: <path d="M20.8 4.6a5.4 5.4 0 0 0-7.6 0L12 5.8l-1.2-1.2a5.4 5.4 0 0 0-7.6 7.6L12 21l8.8-8.8a5.4 5.4 0 0 0 0-7.6Z" />,
+  clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   refresh: (
     <>
       <path d="M20 8a8 8 0 1 0 0 8m0-14v6h-6" />

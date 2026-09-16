@@ -31,7 +31,7 @@ flowchart LR
 
 During development, Vite serves the browser app and proxies `/api` to Express. After `npm run build`, Express can serve `web/dist` and the API from one process. The default listener is `127.0.0.1:3001`. Node 24 supplies the SQLite driver; no native SQLite add-on build is required.
 
-The browser's screen selection uses React state rather than a URL router. A reload returns to the app entry screen; reopening Fraction Peaks restores its saved active state when available. Arithmetic screen state does not have the same resume mechanism.
+The browser's screen selection uses React state rather than a URL router. A reload returns to the app entry screen; reopening Fraction Peaks restores its saved active state when available. Standard arithmetic trails keep a browser-local round pointer and retrieve authoritative state from `GET /api/round/:id`, allowing an existing round or interrupted completion to recover without creating a new round.
 
 ## Ownership by module
 
@@ -44,7 +44,7 @@ The browser's screen selection uses React state rather than a URL router. A relo
 | [`web/src/Reports.tsx`](../web/src/Reports.tsx) | Fraction session summary, arithmetic log, guidance, consent control, evidence export |
 | [`web/src/ui.tsx`](../web/src/ui.tsx) | Shared controls, named dialogs, API helper, storage helpers, speech and sound |
 | [`server/src/app.ts`](../server/src/app.ts) | Request schemas, routes, consent gate, static serving, error responses |
-| [`server/src/rounds.ts`](../server/src/rounds.ts) | Round/problem identity, distinct problems, authoritative answer/hint state, idempotent completion and scoring |
+| [`server/src/rounds.ts`](../server/src/rounds.ts) | Round/problem identity, distinct problems, answer/hint state, hearts, bonus timing, recovery, idempotent completion and scoring |
 | [`server/src/skills.ts`](../server/src/skills.ts) | Arithmetic generation, ranges, exact answers, authored story/hint templates |
 | [`server/src/progress.ts`](../server/src/progress.ts) | Progression, comeback/streak behavior, seven-day facts from events |
 | [`server/src/ai/story.ts`](../server/src/ai/story.ts) | Story/hint/parent prompts, bounded output checks, fallback and provenance |
@@ -69,11 +69,21 @@ The server stores full problems and sends the client UUIDs and presentation data
 
 Requesting a hint marks the stored problem as assisted **before** waiting for a model response. A simultaneous answer cannot bypass that flag. Answered problems cannot request another hint.
 
-`POST /api/round/finish` rejects unfinished rounds and computes results from saved assessments. An unhinted correct answer earns 100 points, a hinted correct answer 60, and an incorrect answer zero. Repeated finish requests return the original completion without another award. The elapsed seconds field is wall time, capped at one hour; it includes idle time and is not attention time.
+Standard trails store their rules when created: seven problems, three hearts, a 120-second bonus window, and a possible 50-point bonus. Each wrong answer spends one heart. The third wrong answer ends the round, including when it happens on the seventh question. After a round ends, new answers and hints are rejected; a replayed answer returns the original assessment.
+
+An unhinted correct answer earns 100 points, a hinted correct answer 60, and an incorrect answer zero. A hint alone does not spend a heart. Completing all seven problems with a heart remaining before the bonus deadline adds 50 points. Expiry alone never ends the round or rejects an answer. The bonus uses the terminal assessment timestamp, not the later Finish click, and the window continues during time away or reload.
+
+`POST /api/round/finish` accepts a terminal round: all problems answered or hearts exhausted. It rejects a still-open round and computes results from saved assessments. Repeated finish requests return the original completion without another award. Elapsed seconds use start-to-terminal-assessment wall time, capped at one hour; idle time is included, so this is not attention time. Waiting on the results screen does not change an earned bonus.
 
 Three consecutive correct unhinted answers at the currently assessed difficulty unlock the next game level. Easier questions remaining in an already-started round cannot keep unlocking higher levels. A hint or incorrect answer resets the consecutive-answer run. These are game progression rules, not validated mastery criteria.
 
-The database stores learners, skill progress, events, rounds, problems, and demo settings. Arithmetic answers and round completion feed the seven-day journal facts. A story uses the same contracts as a one-problem round.
+The database stores learners, skill progress, events, rounds, problems, and demo settings. Arithmetic answers and round completion feed the seven-day journal facts. A story uses a one-problem round without heart or timing rules. Saved rounds from before the trail-rules migration retain their original untimed, heart-free behavior.
+
+### Comeback is a separate choice
+
+After five days away, the optional comeback action lowers each arithmetic practice level by one, with level 1 as the floor, and clears the consecutive-answer run. Historical records remain. An available streak freeze preserves the daily streak once; without one, the comeback resets the streak. Losing hearts never invokes this action or lowers a level. These rules define a return path; they are not evidence of a measured retention benefit.
+
+The synthetic profile uses a stored demonstration date, initialized when seeded. `POST /api/clock/advance` advances that date to make a return scenario reproducible; it does not change the real-time arithmetic bonus clock. Label use of the demonstration clock when showing comeback.
 
 ## AI boundary and failure paths
 
@@ -93,9 +103,10 @@ Each response carries provider, prompt version, field names sent, validation res
 | --- | --- |
 | `GET /api/home`, `GET /api/health` | Demo profile, progression, effective provider and availability |
 | `POST /api/round` | Create an arithmetic round for a known skill |
+| `GET /api/round/:id` | Recover current round state, assessments, hint status, and any stored completion |
 | `POST /api/answer` | Assess one stored problem |
 | `POST /api/hint` | Mark assistance and return checked or authored guidance |
-| `POST /api/round/finish` | Complete an assessed round |
+| `POST /api/round/finish` | Collect a round completed by answering every problem or exhausting its hearts |
 | `POST /api/story` | Create a themed one-problem round, subject to rollout |
 | `GET /api/parent` | Computed arithmetic facts and separate guidance/provenance |
 | `POST /api/settings/ai-consent` | Change the demo consent setting |
@@ -115,6 +126,6 @@ The export action prepares a Blob download and displays the same JSON in a selec
 
 ## Verification and remaining work
 
-The [verification record](../QA.md) documents 56 server tests, including all 43 supplied baseline tests, and 10 fraction tests; deterministic evaluation; builds/type checks; and browser scenarios. Duplicate submissions, incomplete completion, consent, provider failure, range integrity, equivalence, and evidence counting have bounded checks. An individual successful live model call does not establish overall reliability.
+The [verification record](QA.md) holds the current test totals, deterministic evaluation, type/build results, browser scenarios, and remaining coverage. Run the [verification commands](../README.md#verify) against the current release. Check the assessment, hearts/bonus, recovery, consent/fallback, content-integrity, and evidence-summary scenarios there rather than treating an earlier test count as current. Individual successful live model calls do not establish overall reliability.
 
-Priorities are alternate fraction content and measurement, direct semantic/suitability evaluation of model language, consented usability/accessibility work, and identity/storage/administrative boundaries before real deployment. The [product walkthrough](PRODUCT-WALKTHROUGH.md) explains the associated product decisions and proposed metrics. The [disclosure](../DISCLOSURES.md) identifies the supplied baseline and AI-assisted development.
+Priorities are customer discovery, alternate fraction content and measurement, evaluating the effect of comeback and trail challenge, semantic/suitability evaluation of model language, and identity/storage/administrative boundaries before real deployment. The [product walkthrough](PRODUCT-WALKTHROUGH.md) explains the decisions and proposed metrics. The [disclosure](DISCLOSURES.md) identifies the Claude-assisted foundation and subsequent Codex iteration.

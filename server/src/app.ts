@@ -12,7 +12,7 @@ import { SKILLS, MAX_LEVEL } from "./skills.js";
 import { progress, comebackStatus, applyComeback, weeklyFacts, RUN_TO_UNLOCK } from "./progress.js";
 import { storyProblem, hint, parentNote } from "./ai/story.js";
 import { pickAdapter, stubAdapter } from "./ai/adapter.js";
-import { currentLevel, startRound, saveRound, submitAnswer, finishRound, beginHint, cacheHint } from "./rounds.js";
+import { currentLevel, startRound, saveRound, getRound, submitAnswer, finishRound, beginHint, cacheHint } from "./rounds.js";
 
 seed();
 export const app = express();
@@ -53,6 +53,10 @@ app.post("/api/round", (req, res) => {
   const { skill_id } = ok(z.object({ skill_id: z.string() }).strict(), req.body);
   res.json(startRound(L, skill_id));
 });
+app.get("/api/round/:id", (req, res) => {
+  const roundId = ok(z.string().uuid(), req.params.id);
+  res.json(getRound(L, roundId));
+});
 app.post("/api/answer", (req, res) => {
   const b = ok(z.object({ problem_id: z.string().uuid(), answer: z.number().int().finite() }).strict(), req.body);
   res.json(submitAnswer(L, b.problem_id, b.answer));
@@ -69,7 +73,8 @@ app.post("/api/story", asyncRoute(async (req, res) => {
   const r = await storyProblem(b.skill_id, level, randomInt(1, 2 ** 31), b.theme ?? "animals", permittedAdapter());
   const round = saveRound(L, b.skill_id, level, [r.problem]);
   logEvent("story_generated", { learner_id: L, payload: { skill_id: b.skill_id, level, source: r.provenance.final_source } });
-  res.json({ round_id: round.round_id, level, problem: round.problems[0], provenance: r.provenance });
+  res.json({ round_id: round.round_id, level, problem: round.problems[0], provenance: r.provenance,
+    hearts_total: null, hearts_remaining: null, bonus_seconds: null, bonus_deadline_at: null, server_now: round.server_now });
 }));
 
 app.post("/api/hint", asyncRoute(async (req, res) => {

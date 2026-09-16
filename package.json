@@ -1,7 +1,7 @@
 {
   "name": "summit-math",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "workspaces": [
     "server",
     "web"
@@ -12,12 +12,14 @@
     "eval": "npm run eval -w server",
     "start": "npm run start -w server",
     "build": "npm run build -w web",
-    "typecheck": "tsc -p web/tsconfig.json && tsc -p server/tsconfig.json --noEmit"
+    "typecheck": "tsc -p web/tsconfig.json && tsc -p server/tsconfig.json --noEmit",
+    "check:repo": "node scripts/check-repo.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
   },
   "engines": {
     "node": ">=24"
-  }
+  },
+  "license": "MIT"
 }

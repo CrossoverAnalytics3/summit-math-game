@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { Skill, Problem, Provenance } from "./types";
-import { api, Icon, Button, Owl, chime, speak, Modal } from "./ui";
-type RoundData = { round_id: string; level: number; problems: Problem[] };
+import type { Skill, Problem, Provenance, ArithmeticRound, ArithmeticAssessment, ArithmeticFinish } from "./types";
+import { api, Icon, Button, Owl, chime, speak, Modal, readLocal, saveLocal } from "./ui";
 const THEMES = [
   {
     id: "space",
@@ -41,105 +40,184 @@ export default function Arithmetic({
   onExit: () => void;
   onDone: () => void;
 }) {
-  const [data, setData] = useState<RoundData | null>(null),
+  const [data, setData] = useState<ArithmeticRound | null>(null),
     [theme, setTheme] = useState("space"),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [i, setI] = useState(0),
     [entry, setEntry] = useState(""),
-    [result, setResult] = useState<any>(null),
+    [result, setResult] = useState<ArithmeticAssessment | null>(null),
     [hint, setHint] = useState(""),
     [hintUsed, setHintUsed] = useState(false),
     [prov, setProv] = useState<Provenance | null>(null),
-    [finished, setFinished] = useState<any>(null),
+    [finished, setFinished] = useState<ArithmeticFinish | null>(null),
     [exit, setExit] = useState(false),
-    [visual, setVisual] = useState(false);
-  const loadRef = useRef<Promise<RoundData> | null>(null),
-    lock = useRef(false);
+    [visual, setVisual] = useState(false),
+    [resumed, setResumed] = useState(false),
+    [recoveredAssessment, setRecoveredAssessment] = useState(false),
+    [now, setNow] = useState(Date.now());
+  const storageKey = `summit.arithmetic.active.${skill.id}`;
+  const loadRef = useRef<Promise<ArithmeticRound> | null>(null),
+    lock = useRef(false),
+    retryRef = useRef<(() => Promise<void>) | null>(null),
+    clockAnchor = useRef({ server: Date.now(), local: performance.now() });
   const input = useRef<HTMLInputElement>(null);
+
+  const rememberFinish = (r: ArithmeticFinish) => {
+    setFinished(r);
+    if (!story) saveLocal(storageKey, null);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
+  const finishRound = async (roundId: string, celebrate = true) => {
+    rememberFinish(await api("/round/finish", { round_id: roundId }));
+    if (celebrate) chime(sound);
+  };
+  const restoreRound = (r: ArithmeticRound, wasSaved: boolean) => {
+    const assessments = r.assessments || [];
+    const firstOpen = r.problems.findIndex((p) => !assessments.some((a) => a.problem_id === p.id));
+    const last = r.round_ended ? assessments.at(-1) : undefined;
+    const index = last
+      ? r.problems.findIndex((p) => p.id === last.problem_id)
+      : Math.max(0, firstOpen);
+    const hadHint = r.hinted_problem_ids?.includes(r.problems[index]?.id) || false;
+    setData({ ...r, current_level: r.current_level ?? r.level, run: r.run ?? (wasSaved ? 0 : skill.run) });
+    setI(Math.max(0, index));
+    setEntry("");
+    setResult(last || null);
+    setHint("");
+    setHintUsed(hadHint);
+    setVisual(hadHint || !!last && !last.correct);
+    setRecoveredAssessment(!!last);
+    setResumed(wasSaved && !r.result);
+    setFinished(r.result || null);
+    // Only fresh round/snapshot responses synchronize this clock. An answer
+    // replay contains its original timestamp and must not rewind the window.
+    clockAnchor.current = { server: r.server_now ?? Date.now(), local: performance.now() };
+    setNow(clockAnchor.current.server);
+    if (!story) saveLocal(storageKey, r.result ? null : { round_id: r.round_id });
+  };
+  const requestRound = async () => {
+    const saved = readLocal<{ round_id?: string } | null>(storageKey, null);
+    return saved?.round_id
+      ? api(`/round/${encodeURIComponent(saved.round_id)}`)
+      : api("/round", { skill_id: skill.id });
+  };
+  const perform = async (action: () => Promise<void>) => {
+    if (lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    setError("");
+    retryRef.current = action;
+    try {
+      await action();
+      retryRef.current = null;
+    } catch (e) {
+      setError((e as Error).message || "The connection took a little detour. Try again to pick up here.");
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
+  };
+  const recoverRound = async () => {
+    const saved = !!readLocal<{ round_id?: string } | null>(storageKey, null)?.round_id;
+    const r = await requestRound();
+    restoreRound(r, saved);
+    if (r.round_ended && !r.result) await finishRound(r.round_id, false);
+  };
+  const startFresh = () => void perform(async () => {
+    const r = await api("/round", { skill_id: skill.id });
+    restoreRound(r, false);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  });
+
   useEffect(() => {
     if (story) return;
     let active = true;
-    loadRef.current ??= api("/round", { skill_id: skill.id });
+    const saved = !!readLocal<{ round_id?: string } | null>(storageKey, null)?.round_id;
+    lock.current = true;
+    setBusy(true);
+    loadRef.current ??= requestRound();
     loadRef.current
-      .then((r) => {
-        if (active) setData(r);
+      .then(async (r) => {
+        if (!active) return;
+        restoreRound(r, saved);
+        if (r.round_ended && !r.result) {
+          retryRef.current = () => finishRound(r.round_id, false);
+          const complete = await api("/round/finish", { round_id: r.round_id });
+          if (active) rememberFinish(complete);
+        }
+        retryRef.current = null;
       })
       .catch((e) => {
-        if (active) setError(e.message);
+        if (!active) return;
+        retryRef.current ??= recoverRound;
+        setError(e.message);
+      })
+      .finally(() => {
+        if (active) {
+          lock.current = false;
+          setBusy(false);
+        }
       });
     return () => {
       active = false;
     };
   }, [skill.id, story]);
+  useEffect(() => {
+    if (story || !data?.bonus_deadline_at || data.round_ended || finished) return;
+    const tick = () => setNow(clockAnchor.current.server + performance.now() - clockAnchor.current.local);
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [story, data?.round_id, data?.bonus_deadline_at, data?.round_ended, finished]);
+  useEffect(() => {
+    if (data && !busy && !result && !finished && !error) input.current?.focus({ preventScroll: true });
+  }, [data?.round_id, i, busy, result, finished, error]);
   const makeStory = async () => {
-    if (lock.current) return;
-    lock.current = true;
-    setBusy(true);
-    setError("");
-    try {
+    await perform(async () => {
       const r = await api("/story", { skill_id: skill.id, theme });
       setData({ round_id: r.round_id, level: r.level, problems: [r.problem] });
       setProv(r.provenance);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      lock.current = false;
-      setBusy(false);
-    }
+    });
   };
   const p = data?.problems[i];
   const askHint = async () => {
-    if (!p || lock.current || hintUsed || result) return;
-    lock.current = true;
-    setBusy(true);
-    setError("");
-    try {
+    if (!p || lock.current || hint || result || data?.round_ended || error) return;
+    await perform(async () => {
       const r = await api("/hint", { problem_id: p.id });
       setHint(r.hint);
       setHintUsed(true);
       setVisual(true);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      lock.current = false;
-      setBusy(false);
-    }
+    });
   };
   const submit = async () => {
-    if (!p || !entry || result || lock.current) return;
-    lock.current = true;
-    setBusy(true);
-    setError("");
-    try {
-      const r = await api("/answer", {
+    if (!p || !entry || result || lock.current || data?.round_ended || error) return;
+    await perform(async () => {
+      const r: ArithmeticAssessment = await api("/answer", {
         problem_id: p.id,
         answer: Number(entry),
       });
       setResult(r);
+      setData((previous) => previous ? {
+        ...previous,
+        current_level: r.level,
+        run: r.run,
+        hearts_remaining: r.hearts_remaining ?? previous.hearts_remaining,
+        round_ended: r.round_ended,
+        ended_reason: r.ended_reason,
+        answered: r.answered ?? i + 1,
+        score: r.score ?? (previous.score || 0) + (r.correct ? r.used_hint ? 60 : 100 : 0),
+        bonus_points: r.bonus_points ?? 0,
+        assessments: [...(previous.assessments || []).filter((a) => a.problem_id !== r.problem_id), r],
+      } : previous);
       if (r.correct) chime(sound);
       else setVisual(true);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      lock.current = false;
-      setBusy(false);
-    }
+    });
   };
   const next = async () => {
-    if (!data || lock.current) return;
-    if (i === data.problems.length - 1) {
-      lock.current = true;
-      setBusy(true);
-      try {
-        setFinished(await api("/round/finish", { round_id: data.round_id }));
-        chime(sound);
-      } catch (e) {
-        setError((e as Error).message);
-      } finally {
-        lock.current = false;
-        setBusy(false);
-      }
+    if (!data || !result || lock.current || error) return;
+    if (data.round_ended || i === data.problems.length - 1) {
+      await perform(() => finishRound(data.round_id));
     } else {
       window.scrollTo({ top: 0, behavior: "instant" });
       setI(i + 1);
@@ -148,11 +226,16 @@ export default function Arithmetic({
       setHint("");
       setHintUsed(false);
       setVisual(false);
-      input.current?.focus();
+      setRecoveredAssessment(false);
     }
   };
+  const hasHearts = !story && data?.hearts_total != null;
+  const remaining = data?.bonus_deadline_at ? Math.max(0, Math.ceil((data.bonus_deadline_at - now) / 1000)) : 0;
+  const bonusEarned = (data?.bonus_points || 0) > 0;
+  const currentLevel = data?.current_level ?? data?.level ?? skill.level;
+  const stopped = finished?.ended_reason === "hearts";
   return (
-    <div className="game-page arithmetic-game">
+    <div className={`game-page arithmetic-game ${story ? "story-game" : "arithmetic-trail"}`}>
       <div className="game-toolbar">
         <button
           className="back-button"
@@ -164,7 +247,7 @@ export default function Arithmetic({
         <span className="badge">
           {story
             ? "STORY EXPEDITION"
-            : `GRADE ${skill.grade} · LEVEL ${data?.level || skill.level}`}
+            : `GRADE ${skill.grade} · LEVEL ${data?.level ?? skill.level}`}
         </span>
         <span className="small muted">
           {data
@@ -173,44 +256,63 @@ export default function Arithmetic({
         </span>
       </div>
       {finished ? (
-        <section className="summit-finish">
+        <section className={`summit-finish ${stopped ? "trail-rest" : ""}`}>
           <div className="summit-medal">
-            <Icon name="flag" size={60} />
+            <Icon name={stopped ? "leaf" : "flag"} size={60} />
           </div>
-          <div className="eyebrow">ANOTHER LITTLE ADVENTURE</div>
+          <div className="eyebrow">{stopped ? "A BREATHER AT BASECAMP" : "ANOTHER LITTLE ADVENTURE"}</div>
           <h1>
-            {finished.correct === finished.total
+            {stopped
+              ? "A little rest.\nA fresh start."
+              : finished.correct === finished.total
               ? "Look at you go."
               : "A little more practice.\nA little more possibility."}
           </h1>
           <p>
-            {skill.name} · {story ? "Story expedition" : "Practice trail"}{" "}
-            complete
+            {stopped
+              ? `All three hearts have been used in this round. You explored ${finished.answered ?? 0} of ${finished.total} stepping stones.`
+              : `${skill.name} · ${story ? "Story expedition" : "Practice trail"} complete`}
           </p>
           <div className="finish-stats">
             <div>
               <b>
                 {finished.correct}
-                <small> / {finished.total}</small>
+                <small> / {finished.answered ?? finished.total}</small>
               </b>
-              <span>correct matches</span>
+              <span>answers correct</span>
             </div>
             <div>
               <b>{finished.score}</b>
               <span>trail points</span>
             </div>
+            {!story && (
+              <div>
+                <b>{finished.level ?? currentLevel}</b>
+                <span>current level</span>
+              </div>
+            )}
           </div>
+          {!story && (
+            <div className="trail-keepsakes">
+              <span><Icon name="shield" size={16} /> Ending this round does not lower your level.</span>
+              {!!finished.bonus_points && <span className="bonus-earned"><Icon name="spark" size={16} /> +{finished.bonus_points} finish bonus included</span>}
+            </div>
+          )}
           <div className="tip-box">
             <Owl small />
             <p>
-              Try explaining one problem to someone you know. Teaching it is
-              another way to explore it.
+              {stopped
+                ? "A tricky trail is a reason to try a new way. Your answers are saved. We can start fresh, use a nudge, or choose a different adventure."
+                : "Try explaining one problem to someone you know. Teaching it is another way to explore it."}
             </p>
           </div>
-          <Button onClick={onDone}>
+          {!story && <Button onClick={startFresh} disabled={busy || !!error}>
+            {busy ? "Preparing your stepping stones…" : stopped ? "Try a fresh trail" : "Climb again"} <Icon name="refresh" />
+          </Button>}
+          <Button onClick={onDone} secondary={!story} disabled={busy}>
             See my field journal <Icon name="arrow" />
           </Button>
-          <button className="text-button" onClick={onExit}>
+          <button className="text-button" onClick={onExit} disabled={busy}>
             Choose another adventure
           </button>
         </section>
@@ -226,6 +328,7 @@ export default function Arithmetic({
                 className={`theme-card theme-${t.id} ${theme === t.id ? "selected" : ""}`}
                 aria-pressed={theme === t.id}
                 onClick={() => setTheme(t.id)}
+                disabled={busy || !!error}
               >
                 <div className="theme-art">
                   <Icon name={t.icon} size={52} />
@@ -240,7 +343,7 @@ export default function Arithmetic({
             ))}
           </div>
           <div className="story-start">
-            <Button onClick={() => void makeStory()} disabled={busy}>
+            <Button onClick={() => void makeStory()} disabled={busy || !!error}>
               {busy ? "Finding your adventure…" : "Make my adventure"}
               <Icon name="spark" size={18} />
             </Button>
@@ -270,7 +373,42 @@ export default function Arithmetic({
                 ? "Imagine the world. Find the math inside."
                 : "Take a breath, try a strategy, and find your answer."}
             </p>
+            {resumed && <span className="trail-resumed"><Icon name="map" size={13} /> Welcome back. Your stepping stones are saved.</span>}
           </div>
+          {hasHearts && data && (
+            <section className="trail-dashboard" aria-label="Arithmetic trail status">
+              <div className="trail-stat hearts-stat">
+                <span className="trail-stat-label">YOUR TRAIL HEARTS</span>
+                <div className="trail-hearts" aria-label={`${data.hearts_remaining} of ${data.hearts_total} hearts left`} role="img">
+                  {Array.from({ length: data.hearts_total! }, (_, n) => <Icon key={n} name="heart" size={23} className={n < (data.hearts_remaining ?? 0) ? "heart-full" : "heart-resting"} />)}
+                </div>
+                <small>{data.hearts_remaining === 0 ? "Time for a fresh trail" : "A new try after three misses"}</small>
+              </div>
+              <div className="trail-stat">
+                <span className="trail-stat-label">POINTS COLLECTED</span>
+                <strong><Icon name="spark" size={18} /> {data.score || 0}</strong>
+                <small>{bonusEarned ? "Includes your +50 bonus" : "Each answer can add more"}</small>
+              </div>
+              <div className="trail-stat">
+                <span className="trail-stat-label">LEVEL STREAK</span>
+                <strong>{data.run ?? skill.run}<span> / 3</span></strong>
+                <small>Independent answers in a row</small>
+              </div>
+              <div className={`trail-stat bonus-stat ${bonusEarned ? "is-earned" : remaining === 0 ? "is-open-pace" : ""}`}>
+                <div className="bonus-stat-heading">
+                  <span className="trail-stat-label">{bonusEarned ? "BONUS COLLECTED" : "A LITTLE EXTRA"}</span>
+                  {!data.round_ended && remaining > 0 && <span className="bonus-clock" aria-label={`${Math.floor(remaining / 60)} minutes ${remaining % 60} seconds in the bonus window`}><Icon name="clock" size={13} /><span>{Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}</span></span>}
+                </div>
+                <div className="bonus-message" role="status">
+                  {bonusEarned ? "+50 points. You made the whole trail!" : data.round_ended ? "Your earned points stay with you." : remaining > 0 ? `Finish all ${data.problems.length} for +50 points.` : "Keep going—your points are safe."}
+                </div>
+                {!data.round_ended && remaining > 0 ? <>
+                  <div className="bonus-track" aria-hidden="true"><span style={{ width: `${Math.min(100, remaining / (data.bonus_seconds || 120) * 100)}%` }} /></div>
+                  <small>The bonus clock never stops your play.</small>
+                </> : <small>{bonusEarned ? "Thoughtful practice counts, too." : "No points are taken away."}</small>}
+              </div>
+            </section>
+          )}
           <div className="game-layout">
             <section
               className={`puzzle-stage arithmetic-stage ${story ? "story-stage" : ""}`}
@@ -323,7 +461,7 @@ export default function Arithmetic({
                       </>
                     )}
                   </div>
-                  <form
+                  {!recoveredAssessment && <form
                     onSubmit={(e) => {
                       e.preventDefault();
                       void submit();
@@ -342,7 +480,7 @@ export default function Arithmetic({
                         autoComplete="off"
                         value={entry}
                         placeholder="Your answer"
-                        disabled={!!result || busy}
+                        disabled={!!result || busy || !!error || data?.round_ended}
                         onChange={(e) =>
                           setEntry(
                             e.target.value.replace(/[^0-9]/g, "").slice(0, 5),
@@ -375,7 +513,7 @@ export default function Arithmetic({
                           <button
                             type={k === "enter" ? "submit" : "button"}
                             key={k}
-                            disabled={busy || (k === "enter" && !entry)}
+                            disabled={busy || !!error || data?.round_ended || (k === "enter" && !entry)}
                             aria-label={
                               k === "delete"
                                 ? "Delete last digit"
@@ -412,7 +550,7 @@ export default function Arithmetic({
                         ))}
                       </div>
                     )}
-                  </form>
+                  </form>}
                   {result && (
                     <div
                       className={`answer-feedback ${result.correct ? "success" : ""}`}
@@ -430,20 +568,25 @@ export default function Arithmetic({
                             : "That’s another connection made."
                           : `${p.prompt} = ${result.expected_answer}. ${skill.tip}`}
                       </p>
-                      <Button onClick={() => void next()} disabled={busy}>
-                        {i === data!.problems.length - 1
+                      {hasHearts && !result.correct && <p className="heart-feedback">
+                        <Icon name="heart" size={14} />
+                        {data?.ended_reason === "hearts" ? "This round is at its resting spot. Your level stays where it is." : `One heart used. ${data?.hearts_remaining} ${data?.hearts_remaining === 1 ? "heart is" : "hearts are"} ready for the next step.`}
+                      </p>}
+                      {recoveredAssessment && <p className="small muted">This answer was already checked. Your result is saved.</p>}
+                      <Button onClick={() => void next()} disabled={busy || !!error}>
+                        {busy ? "Saving your trail…" : data?.ended_reason === "hearts" ? "Rest at basecamp" : data?.round_ended || i === data!.problems.length - 1
                           ? "Finish this trail"
                           : "Next little challenge"}
                         <Icon name="arrow" />
                       </Button>
                     </div>
                   )}
-                  <div className="arithmetic-dots" aria-label="Round progress">
+                  <div className="arithmetic-dots" role="img" aria-label={`${data?.answered ?? i} of ${data!.problems.length} stepping stones answered`}>
                     {data!.problems.map((_, n) => (
                       <i
                         key={n}
                         className={
-                          n < i ? "complete" : n === i ? "current" : ""
+                          n < (data?.answered ?? i) ? "complete" : n === i ? "current" : ""
                         }
                       />
                     ))}
@@ -477,14 +620,14 @@ export default function Arithmetic({
                 <button
                   className="coach-hint"
                   onClick={() => void askHint()}
-                  disabled={busy || hintUsed || !!result || !p}
+                  disabled={busy || !!error || !!hint || !!result || !p || data?.round_ended}
                 >
                   <Icon name="spark" size={17} />
-                  {hintUsed ? "Your nudge is ready" : "Give me a little nudge"}
+                  {hint ? "Your nudge is ready" : hintUsed ? "Show my saved nudge" : "Give me a little nudge"}
                   <Icon name="arrow" size={15} />
                 </button>
                 <span className="coach-source">
-                  Hints help you practice. Independent answers grow your level.
+                  {hasHearts ? "Hints keep every heart. Independent answers grow your level." : "Hints help you practice. Independent answers grow your level."}
                 </span>
               </div>
               {visual && p && (
@@ -496,10 +639,9 @@ export default function Arithmetic({
               <div className="trail-note">
                 <Icon name="leaf" />
                 <div>
-                  <h4>Your own pace is the right pace.</h4>
+                  <h4>{hasHearts ? "Every point is a little foothold." : "Your own pace is the right pace."}</h4>
                   <p>
-                    There’s no countdown. Your next step is ready whenever you
-                    are.
+                    {hasHearts ? "100 points for a correct independent answer; 60 with a nudge. The two-minute window adds a finish bonus. It never takes your points away." : "There’s no countdown. Your next step is ready whenever you are."}
                   </p>
                 </div>
               </div>
@@ -531,28 +673,28 @@ export default function Arithmetic({
       )}
       {error && (
         <div className="error-banner" role="alert">
-          {error}
-          <button
-            className="text-button"
-            onClick={() => {
-              setError("");
-              if (!story && !data) {
-                loadRef.current = api("/round", { skill_id: skill.id });
-                loadRef.current.then(setData).catch((e) => setError(e.message));
-              }
-            }}
-          >
-            Try again
-          </button>
+          <span>{error} {data && "Try again to pick up at this same step."}</span>
+          <div className="trail-error-actions">
+            <button className="text-button" disabled={busy} onClick={() => {
+              if (retryRef.current) void perform(retryRef.current);
+            }}>{busy ? "Reconnecting…" : "Try again"}</button>
+            {!story && data && !finished && <button className="text-button" disabled={busy} onClick={() => void perform(async () => {
+              const r = await api(`/round/${encodeURIComponent(data.round_id)}`);
+              restoreRound(r, true);
+              if (r.round_ended && !r.result) await finishRound(r.round_id, false);
+            })}>Check saved progress</button>}
+            {!story && !data && <button className="text-button" disabled={busy} onClick={startFresh}>Start a fresh trail</button>}
+          </div>
         </div>
       )}
       {exit && (
         <Modal title="Head back to basecamp?" onClose={() => setExit(false)}>
           <p className="muted">
-            Answers you've already completed stay in your journal. You can begin
-            a new practice trail next time.
+            {story
+              ? "Answers you've already completed stay in your journal. You can choose a new story next time."
+              : "Your answers and remaining hearts are saved. Choose this trail again to pick up here. The bonus window keeps running while you are away; your earned points stay safe."}
           </p>
-          <Button onClick={onExit}>
+          <Button onClick={onExit} disabled={busy}>
             Back to basecamp <Icon name="home" />
           </Button>
           <Button secondary onClick={() => setExit(false)}>
