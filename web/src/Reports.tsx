@@ -15,6 +15,7 @@ type ParentReport = {
     }[];
     levels: { skill_id: string; name: string; level: number }[];
     rounds: number;
+    homework?: { pages: number; spotted: number; explained: number; fixed: number };
   };
   note: string;
   provenance: Provenance;
@@ -313,7 +314,12 @@ export default function Reports({
               )}
               <p className="muted report-caption">
                 {parent.facts.rounds} completed arithmetic{" "}
-                {parent.facts.rounds === 1 ? "round" : "rounds"}. Game levels
+                {parent.facts.rounds === 1 ? "round" : "rounds"}.
+                {parent.facts.homework && parent.facts.homework.pages > 0 && (
+                  <>
+                    {" "}Checked {parent.facts.homework.pages} of Pip's worksheet{parent.facts.homework.pages === 1 ? "" : "s"}: found the slip {parent.facts.homework.spotted}, named the reason {parent.facts.homework.explained}, fixed the answer {parent.facts.homework.fixed}.
+                  </>
+                )} Game levels
                 reflect progression rules; they are not a measurement of
                 mastery.
               </p>

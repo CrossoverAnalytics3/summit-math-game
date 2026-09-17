@@ -1,30 +1,33 @@
-# AI and material disclosure
+# Development, AI, and material disclosure
 
-## Development
+## Development contribution
 
-> I built the foundation with Claude, then iterated with Codex. AI coding tools did most of the typing; the product decisions, the thesis, and the review were mine.
+I built the foundation with Claude, then iterated with Codex. AI coding tools did most of the typing; the product direction and review were mine.
 
-The Claude-assisted foundation supplied the original arithmetic application. The Codex iteration added the alpine experience, Fraction Peaks, session reporting, stronger arithmetic assessment, AI boundaries, verification, and documentation. Assisting agents contributed bounded research, implementation, and review. The [development record](DEVELOPMENT-RECORD.md) distinguishes the foundation and later changes.
+The original Summit supplied the alpine mountain, Pip, fraction tower, arithmetic practice, existing reporting, and local server. This iteration changes the main experience to teaching Pip through an expedition with visible consequences and correctable evidence. AI coding assistance produced implementation, documentation, and bounded review under the user's direction. Final verification belongs in [VERIFICATION.md](VERIFICATION.md).
 
-## Visual materials
+The [legacy documents](legacy/) are an archive of the earlier release. Their descriptions, dates, and test totals are historical; they are not automatically current claims about Teach the Climb.
 
-- **AI-generated scenery:** `web/public/art/summit-island.png` was generated for Summit with the built-in image-generation tool. No third-party reference image was supplied to that generation. The exact prompt and provenance are retained in [ARTWORK.md](ARTWORK.md).
-- **Code-native visuals:** tower geometry, Pip, interface icons, planets, number lines, and fraction models use SVG/CSS/React created during the Codex iteration.
-- **Product screenshot:** `docs/images/fraction-peaks.png` is an unmodified capture of the running app with its synthetic demo profile, not a generated mockup. The README uses the original mountain scenery PNG described above.
-- **Fonts:** [DM Sans](https://github.com/google/fonts/tree/main/ofl/dmsans) and [Space Grotesk](https://github.com/google/fonts/tree/main/ofl/spacegrotesk) are requested from Google Fonts with system-font fallback. Their upstream repositories distribute the fonts under the SIL Open Font License. Font binaries are not bundled in this source package.
+## Artwork and dependencies
 
-## Runtime AI
+- The unchanged `web/public/art/summit-island.png` is the original Summit mountain generated for this project. The archived [artwork record](legacy/ARTWORK.md) contains its creation details and prompt.
+- New expedition scenery, companions, models, and controls are code-native SVG/CSS/React. The original mountain PNG is retained; no new AI-generated bitmap asset was created for this iteration.
+- The root README intentionally shows the original hero PNG. Browser screenshots, when present, are captures of the actual product and should be identified separately from concept art.
+- The dependency lockfile, [inventory](materials/dependency-inventory-with-sources.md), [notices](materials/THIRD_PARTY_NOTICES.txt), and [supplemental notices](materials/supplemental-license-notices.txt) remain included. A copied inventory should be refreshed if dependencies change.
+- Existing font loading may request Google Fonts with system fallback. Font binaries are not bundled solely by that CSS request; see the archived materials record for source details.
 
-Optional Anthropic Messages API calls produce arithmetic stories, hints, and parent guidance. `AI_MODEL` controls the model; the live demonstration used the configured alias `claude-sonnet-4-5`. That alias is not presented as a verified dated model snapshot. Fraction feedback is authored and deterministic, and code owns mathematical assessment, scoring, progression, and report totals.
+The project source uses the root MIT license; other materials retain their own terms.
 
-The app labels the content source and uses authored fallback for missing access, provider failure, timeout, or rejected output. Numeric and format checks do not establish arbitrary semantic accuracy or child suitability. Credentials are excluded from the repository. [QA](QA.md) records verification and its limits.
+## AI at runtime
 
-## Dependencies and verification tools
+Teaching Pip means changing the supported instructions it executes. It does not train or fine-tune the underlying language model. In the new expedition, the optional provider selects a question and Pip line from finite authored banks. It does not write the journal's observations or tentative next steps. Deterministic code owns quantities and results. Authored selection keeps the experience usable.
 
-The [dependency inventory](DEPENDENCIES.md), [lockfile](../package-lock.json), [source inventory](materials/dependency-inventory-with-sources.md), [collected notices](materials/THIRD_PARTY_NOTICES.txt), and [supplemental notices](materials/supplemental-license-notices.txt) identify incorporated packages and available license records. Node.js is installed separately and has its own notices.
+Source labels should reflect the returned content. A configured key is not proof that a response came from the model. A passing response validator is not proof that every interpretation is correct. The child or adult can dispute an interpretation, and downstream guidance must respond to that correction.
 
-The GitHub Actions workflow uses [actions/checkout v7](https://github.com/actions/checkout) and [actions/setup-node v7](https://github.com/actions/setup-node) on a GitHub-hosted runner. GitHub's current examples support those versions and Node 24. The actions are fetched by the workflow and are not bundled in the app. A local passing result does not establish the outcome of a separate hosted run.
+This release was browser-tested with authored questions. No live provider call is claimed; provider behavior is covered through automated adapter tests.
 
-The source package uses one synthetic demo learner and excludes runtime databases, private configuration, interview documents, and credentials. No real child records, private training dataset, or biometric inputs were used in this iteration.
+## Data and scope
 
-Project and third-party terms are explained in [LICENSING.md](LICENSING.md). The [challenge guide](HACKATHON.md) links the contest's separate submission terms; this material inventory does not itself submit an entry.
+No real child records, interview files, private training corpus, biometric input, or provider credentials are needed in the source package or demo. Use synthetic demonstration data and avoid identifiable information in notes. Optional AI receives the structured context, plan, recomputed result, and booleans for recorded prediction/support. It does not receive learner notes, correction text, the evidence ID, or prior-session history. The [architecture](ARCHITECTURE.md) specifies the request and storage boundaries.
+
+This is a local prototype, not a deployed classroom record system or a validated assessment. Broader use requires an appropriate consent and data process, access controls, retention policy, and educational evaluation.

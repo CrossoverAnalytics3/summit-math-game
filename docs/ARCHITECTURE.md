@@ -1,131 +1,119 @@
-# Summit architecture
+# Architecture — Teach the Climb
 
-Summit is a React/TypeScript browser app with an Express API and local SQLite database. The fraction expedition runs in the browser. Arithmetic assessment is owned by the server. Optional model calls supply short language around code-generated math.
+This document describes version 0.5.3. Current check results belong in [VERIFICATION.md](VERIFICATION.md); the [persistence contract](TEACHING-PERSISTENCE.md) details the journal and worksheet evidence APIs. Earlier arithmetic and fraction architecture is archived in [legacy/ARCHITECTURE.md](legacy/ARCHITECTURE.md).
 
-It is a single synthetic learner demonstration, not a production multi-user service.
+## Responsibilities
 
-## Runtime and data flow
+| Layer                       | Owns                                                                                                                                           | Does not establish                                                                              |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| React / TypeScript / Vite   | Route choices, teaching controls, predictions, replay, progression, tutor brief and journal corrections                                        | Mathematical truth through visual appearance alone                                              |
+| Shared deterministic engine | Supported instructions, quantities, contexts, run results, evidence floor and correction dependencies                                          | Long-term mastery, intention or personality                                                     |
+| Express / Node 24 / SQLite  | Validated journal persistence, recomputed outcomes, preserved observations, revision conflicts, model access and inherited arithmetic services | Independent proof of a child's identity or of assistance outside the app                        |
+| Optional Anthropic adapter  | Selects a reviewed question and Pip line using bounded integer IDs                                                                             | Generating report claims, grading, modifying outcomes or retraining itself from a child's input |
+| Tutor brief                 | Traceable session observations, uncertainty, support and questions with sufficient eligible sources                                            | A clinical, psychometric or learning-style assessment                                           |
 
-```mermaid
-flowchart LR
-    A[React app and screen navigation] --> B[Fraction towers and session checks]
-    B --> C[Authored fractions and exact equivalence]
-    B --> D[(Browser localStorage)]
-    A --> E[Arithmetic and story screens]
-    E --> F[Express API]
-    F --> G[Round assessment and progression]
-    G --> H[(Local SQLite)]
-    F --> I[Consent gate and model adapter]
-    I --> J[Optional Anthropic request]
-    I --> K[Authored fallback]
-    J --> L[Bounded text checks]
-    L -->|accepted| M[Text with provenance]
-    L -->|rejected or unavailable| K
-    K --> M
-    M --> F
-    A --> N[Field journal]
-    D --> N
-    F -->|Arithmetic facts and guidance| N
-    N --> O[JSON download and selectable export]
+## Frontend structure
+
+`App.tsx` coordinates the active page, teaching actions and shared dialogs. The main surfaces have separate components:
+
+- `TeachHome.tsx`: the original mountain hero, entry actions and route progress.
+- `TeachFlow.tsx`: instruction controls, predictions, scene, replay and next actions.
+- `TeachingJournal.tsx`: individual run records, notes, interpretation status and correction entry.
+- `TutorBrief.tsx` and `tutorEvidence.ts`: the four-question adult summary, computed from explicit records and linked back to them.
+- `ExpeditionProgress.tsx` and `progressModel.ts`: observed successes on each route and the optional return warm-up.
+- `useTeachingJournal.ts` and `localJournal.ts`: synchronization, conflict handling, offline cache and recovery of unreadable local data.
+- `Homework.tsx`: the child's arithmetic rules and the worked-example activity, with server-owned answer checking.
+- `HomeworkEvidence.tsx`, `homeworkEvidenceModel.ts` and `useHomeworkEvidence.ts`: separately labeled worksheet records, three outcome counts, source links and a fresh server read on each journal visit.
+
+`TeachScene.tsx` holds the scene artwork and `ui.tsx` holds shared controls. `LegacyApp.tsx` continues to own the original practice entry points. The visual design and original mountain image are retained.
+
+## Authoritative execution and progression
+
+The first camp uses twelve berries and three friends. Beacon Ridge changes the basket to nine for the same group. Meadow Camp keeps twelve berries and adds a fourth friend. Both routes end with an eight-berry, four-friend summit check. The three plan types are a fixed amount, repeated one-each sharing rounds, and a fraction of the starting basket.
+
+`shared/expedition.ts` supplies the supported plans, exact simulation, route contexts, run records, correction functions and summaries. The browser uses it for immediate feedback; the server uses it to rebuild every saved run and to prepare coaching requests. Submitted context, shares, replay steps and completion claims cannot override the engine's calculation.
+
+Pip follows the accepted instruction. A correct plan works immediately; the changed context can expose a plan's limits without staging an error. The prediction field asks what a fair share would be, rather than asking the child to forecast an unequal execution.
+
+The home trail displays **first teaching → changed situation → fresh summit challenge** for each route. Its checkmarks mean that an eligible, completed fair share was observed at that stage. They can accumulate across attempts; they do not imply one unchanged plan, one uninterrupted climb or enduring mastery. System-issue runs are excluded. The last successful summit record also indicates whether picture or coach support was recorded.
+
+After five days away from an unfinished expedition, the home surface offers an existing six-berry tutorial example or a return to the saved camp. It retains previous achievements and does not reset difficulty. This is a return experience to evaluate, not a demonstrated retention intervention. Longer expeditions and a sequenced curriculum remain future work. Original arithmetic levels retain their separate consecutive-correct, no-hint progression rule.
+
+## Guidance before and during play
+
+`QuickTutorial.tsx` provides four-step authored demonstrations for each teaching route, Fraction Peaks, arithmetic and story play. The animations use separate example quantities and never create runs or call the model. **Use this teaching** confirms an instruction before the prediction and run; changing the plan or entering a new situation clears that confirmation. The guide follows choose, predict, try and compare. Editing a prediction after a result clears the active result reference while retaining the historical run.
+
+`ActionBeacon.tsx` connects controls to `guidance.ts`. The first eligible idle nudge appears after ten seconds. After another interaction or reset, the next requires thirty quiet seconds; automatic nudges then stop for that activity. The budget survives target and step changes within the activity. Dialogs, hidden tabs, playback and unavailable controls suppress guidance without consuming a nudge. **Show me** scrolls and focuses the control without activating it. Reduced-motion settings use steady cues.
+
+Tutorials and navigation cues are separate from the recorded mathematical picture and coach support. A fresh arithmetic round starts after its entry tutorial closes; replaying the tutorial cannot reset an existing server-owned bonus deadline. [Tutorial and controls guide](ONBOARDING.md)
+
+## Evidence, interpretations and the tutor brief
+
+The evidence flow is:
+
+```text
+accepted instruction + fair-share prediction + situation
+                    ↓
+              deterministic run
+                    ↓
+     observed execution + support + learner account
+                    ↓
+      at least two distinct eligible observations
+                    ↓
+       tentative interpretation → next question
+                    ↑                ↓
+          correction/context → dependent withdrawal
 ```
 
-During development, Vite serves the browser app and proxies `/api` to Express. After `npm run build`, Express can serve `web/dist` and the API from one process. The default listener is `127.0.0.1:3001`. Node 24 supplies the SQLite driver; no native SQLite add-on build is required.
+One run remains an observation, with **insufficient evidence** for an interpretation. `createInterpretation` checks actual referenced runs, not only a count of IDs. Duplicate IDs cannot satisfy the floor; missing runs are invalid and system-issue runs are ineligible. `reconcileInterpretations` applies the same rules on restore and save. Two observations permit a tentative interpretation; they do not prove a pattern, learning gain or preferred learning style.
 
-The browser's screen selection uses React state rather than a URL router. A reload returns to the app entry screen; reopening Fraction Peaks restores its saved active state when available. Standard arithmetic trails keep a browser-local round pointer and retrieve authoritative state from `GET /api/round/:id`, allowing an existing round or interrupted completion to recover without creating a new round.
+An adult or learner can add context or report **Pip misunderstood my instruction**. The original plan and replay remain visible. A targeted system correction flags only the selected run, excludes it from learner-evidence counts and withdraws questions whose sources are no longer valid. Dependency withdrawal is transitive. Confirming a question cannot reactivate a corrected, withdrawn or insufficient interpretation. Saved correction context and withdrawn questions cannot be silently rewritten by a subsequent journal save.
 
-## Ownership by module
+The tutor brief has four rows: **what was demonstrated, what is still uncertain, what support appeared, and what could we ask next**. Each evidence-bearing line links to its run records. It distinguishes successful sharing, a fixed summit check, recorded support, system issues and the learner's own note. When no eligible interpretation-based question is active, it asks for another observation or a description in the learner's own words. It does not manufacture a profile to fill the card.
 
-| Module | Responsibility |
-| --- | --- |
-| [`web/src/App.tsx`](../web/src/App.tsx) | Home, screen navigation, trail/theme entry, preferences, global dialogs |
-| [`web/src/TowerGame.tsx`](../web/src/TowerGame.tsx) | Fraction interaction, area/line visuals, scaffold, attempts/help, resume and session persistence |
-| [`web/src/fractions.ts`](../web/src/fractions.ts) | Authored tower/check content, exact equivalence, targeted strategies, evidence summary |
-| [`web/src/Arithmetic.tsx`](../web/src/Arithmetic.tsx) | Arithmetic/story presentation, answer and hint requests, result display, provenance |
-| [`web/src/Reports.tsx`](../web/src/Reports.tsx) | Fraction session summary, arithmetic log, guidance, consent control, evidence export |
-| [`web/src/ui.tsx`](../web/src/ui.tsx) | Shared controls, named dialogs, API helper, storage helpers, speech and sound |
-| [`server/src/app.ts`](../server/src/app.ts) | Request schemas, routes, consent gate, static serving, error responses |
-| [`server/src/rounds.ts`](../server/src/rounds.ts) | Round/problem identity, distinct problems, answer/hint state, hearts, bonus timing, recovery, idempotent completion and scoring |
-| [`server/src/skills.ts`](../server/src/skills.ts) | Arithmetic generation, ranges, exact answers, authored story/hint templates |
-| [`server/src/progress.ts`](../server/src/progress.ts) | Progression, comeback/streak behavior, seven-day facts from events |
-| [`server/src/ai/story.ts`](../server/src/ai/story.ts) | Story/hint/parent prompts, bounded output checks, fallback and provenance |
-| [`server/src/ai/adapter.ts`](../server/src/ai/adapter.ts) | Provider interface, stub, Anthropic request, prompt versions, timeout |
-| [`server/src/db.ts`](../server/src/db.ts) | SQLite schema, transactions, synthetic profile, demo date and reset |
+### Worksheet checks are a separate evidence stream
 
-## Fraction assessment boundary
+**Fix Pip's homework** presents three worked examples from the selected arithmetic skill, with one authored mathematical slip. The child chooses a card, chooses a reason from four options and enters a corrected answer. `shared/homework.ts` constructs and checks the task; the server retains the answer key until submission. A preferred authored slip can be requested through the API when it fits the numbers. This does not match the child's earlier worksheet or automatically interpret tutor session notes.
 
-Fraction values are integer numerator/denominator pairs. Equivalence uses exact `BigInt` cross-products, avoiding floating-point equality. Every tower has three lists of four authored choices. `TowerGame` checks all three against the target; the scaffold changes subdivisions while preserving the displayed amount.
+The server records **found the slip**, **named the reason** and **fixed the answer** separately. Naming and fixing require selection of the slipped card, preventing a coincidentally matching reason or number on the wrong card from receiving credit. These are checks of a supported task: Pip's steps and reason choices were visible. They neither advance nor reset the independent arithmetic trail streak. Additional adult assistance and an unaided verbal explanation are not recorded by this activity.
 
-Each evidence record contains an item ID, `tower` or `check` kind, correctness, assistance, and attempts. A check contributes to the independent count only if correct, unassisted, and first attempt. Supported success means help or another attempt was needed. Checks accept one response, while practice towers allow retry.
+The browser tutor brief combines climb records with completed worksheets while retaining their distinct labels and source links. The worksheet follow-up is an authored invitation to explain a step, not an inferred learner trait or a climb interpretation. Worksheet records do not satisfy the two-climb-observation interpretation floor. An adult can inspect the exact submitted choices, Pip's original steps and the checked result; older records without saved selections say that those selections were not recorded. [Proposed evaluation measures](PRODUCT-GUIDE.md#worksheet-evaluation)
 
-Active state is stored under `summit.fraction.active`. Completed sessions are appended once per session ID under `summit.fraction.sessions`, retaining the latest 30. Preferences use `summit.preferences`. The journal filters malformed stored session records before presenting them.
+## Persistence, conflicts and recovery
 
-These are browser-local records. They can be cleared, blocked, or edited by the browser user, and they are not authoritative assessment records. The same two check items repeat on a later play-through. Session counts therefore do not establish lasting mastery or retention.
+`shared/journal.ts` defines the shared `Journal` contract and its strict parser. SQLite has separate tables for current journal state, runs and interpretations. A bounded workspace holds up to 200 runs and 200 interpretations. Previously saved instructions, predictions, support labels, dates, evidence links and ordering are preserved; new attempts append to the history. Notes remain editable context. State and record changes commit together.
 
-## Arithmetic assessment boundary
+The four journal endpoints are:
 
-A normal round selects seven distinct problem prompts from the current skill and level. Selection is seeded and bounded: a future content pool too small to produce seven unique prompts returns an error rather than looping indefinitely or silently repeating questions.
+| Endpoint                     | Purpose                                                  |
+| ---------------------------- | -------------------------------------------------------- |
+| `GET /api/teaching/journal`  | Read the current `{ revision, journal }` snapshot.       |
+| `PUT /api/teaching/journal`  | Validate and save against the supplied revision.         |
+| `GET /api/teaching/runs/:id` | Read a canonical observed run.                           |
+| `GET /api/teaching/brief`    | Read canonical runs, interpretations and summary counts. |
 
-The server stores full problems and sends the client UUIDs and presentation data without the answer. `POST /api/answer` accepts only a problem ID and integer answer. The stored answer is authoritative; a transaction records the result and progress together. Replayed requests return the original result, even if the submitted answer changes.
+`GET /api/homework/evidence` is a separate read-only route returning `{ worksheets, total, limit }`. It reads only submitted worksheets for the current local learner, with a view limit of 100, ordered by creation time. `shared/homeworkEvidence.ts` specifies worksheet prompts and steps, reason choices, the exact submitted response, completion time and three checked outcomes. The underlying `homework_sets` table is separate from teaching runs and interpretations. The journal write API cannot create or rewrite these worksheet results. `GET /api/teaching/brief` remains climb-only; the frontend composes the two evidence streams.
 
-Requesting a hint marks the stored problem as assisted **before** waiting for a model response. A simultaneous answer cannot bypass that flag. Answered problems cannot request another hint.
+The worksheet evidence route and browser request use `no-store`. Each journal visit refreshes the worksheet view; a failed read shows an error and retry, not a claim that no work exists. Worksheet records do not enter the offline teaching cache. The UI provides separate climb-journal and worksheet exports, and identifies when its worksheet counts cover a limited view rather than the full history.
 
-Standard trails store their rules when created: seven problems, three hearts, a 120-second bonus window, and a possible 50-point bonus. Each wrong answer spends one heart. The third wrong answer ends the round, including when it happens on the seventh question. After a round ends, new answers and hints are rejected; a replayed answer returns the original assessment.
+A changed save against an old revision returns **409** with the server copy. An exact retry of the already-saved payload returns that snapshot without duplicating records. The browser serializes writes, retains local edits during a conflict and offers a local download before loading the server copy. It does not silently merge incompatible observations. The existing explicit demo reset clears the teaching tables along with the other demo data.
 
-An unhinted correct answer earns 100 points, a hinted correct answer 60, and an incorrect answer zero. A hint alone does not spend a heart. Completing all seven problems with a heart remaining before the bonus deadline adds 50 points. Expiry alone never ends the round or rejects an answer. The bonus uses the terminal assessment timestamp, not the later Finish click, and the window continues during time away or reload.
+The browser cache remains at `summit.teach.v1`, with separate synchronization metadata. It allows local work when the server is unavailable. The known older omission of `planConfirmed` is migrated; other rejected data is preserved verbatim in a recovery archive and offered for download. If local storage cannot preserve that archive, the original key is protected from overwrite and an in-memory recovery download remains available. Storage failure and sync failure are surfaced rather than presented as successful saving.
 
-`POST /api/round/finish` accepts a terminal round: all problems answered or hearts exhausted. It rejects a still-open round and computes results from saved assessments. Repeated finish requests return the original completion without another award. Elapsed seconds use start-to-terminal-assessment wall time, capped at one hour; idle time is included, so this is not attention time. Waiting on the results screen does not change an earned bonus.
+This is one **local demonstration workspace**, consistently bound to the existing synthetic learner `L-1`. Another browser connected to the same accessible server can read the saved journal. Separate servers or database files do not share it. These endpoints provide no authentication, tutor roles, account isolation or hosted cross-device service. Broader deployment needs deliberate access, retention, consent and privacy design.
 
-Three consecutive correct unhinted answers at the currently assessed difficulty unlock the next game level. Easier questions remaining in an already-started round cannot keep unlocking higher levels. A hint or incorrect answer resets the consecutive-answer run. These are game progression rules, not validated mastery criteria.
+Server recomputation guarantees mathematical consistency with submitted inputs. Predictions, support use and dates are still client-recorded observations, not independently supervised assessment evidence. Arithmetic and worksheets keep their own SQLite records and fraction activity keeps its browser records. Completed worksheets are now visible in both the parent report and teaching journal, with different stated scopes; neither surface turns them into expedition runs or independent mastery evidence.
 
-The database stores learners, skill progress, events, rounds, problems, and demo settings. Arithmetic answers and round completion feed the seven-day journal facts. A story uses a one-problem round without heart or timing rules. Saved rounds from before the trail-rules migration retain their original untimed, heart-free behavior.
+## Runtime AI and fallback
 
-### Comeback is a separate choice
+API credentials belong in a private root `.env`; `.env.example` contains no usable key. An adult-facing setting must also permit AI. `server/src/teaching.ts` provides finite question and Pip-line banks. The model returns only a question ID and story-line ID; strict validation accepts integers 0–2 with no extra fields. Missing access, a failed request, an eight-second timeout or rejected output uses authored selection. The request is capped at 60 output tokens. A source label identifies the path used.
 
-After five days away, the optional comeback action lowers each arithmetic practice level by one, with level 1 as the floor, and clears the consecutive-answer run. Historical records remain. An available streak freeze preserves the daily streak once; without one, the comeback resets the streak. Losing hearts never invokes this action or lowers a level. These rules define a return path; they are not evidence of a measured retention benefit.
+`POST /api/teaching/coach` validates route, stage, plan, bounded prediction, support labels, evidence ID and variation, then recomputes the simulation. The provider receives route, stage, quantities, plan, computed shares/leftovers/outcome, and booleans indicating whether a prediction or support was recorded. It receives **no journal notes, correction text, actual prediction, evidence ID or prior-session history**. Explicit coaching requests are limited to twelve per minute per address; ordinary local simulation does not consume that allowance.
 
-The synthetic profile uses a stored demonstration date, initialized when seeded. `POST /api/clock/advance` advances that date to make a return scenario reproducible; it does not change the real-time arithmetic bonus clock. Label use of the demonstration clock when showing comeback.
+The returned evidence ID is a journal reference, not authentication. The response combines selected language with a code-authored description of the actual simulation. The optional model does not generate report claims, determine the evidence floor, change the learner's plan, award progress or retrain itself. Notes and corrections stay in the local journal server and browser cache; JSON exports contain them too. The inherited arithmetic story adapter remains a separate feature with its own boundaries.
 
-## AI boundary and failure paths
+## Scope and reuse
 
-All exposed story, hint, and parent-note routes choose their adapter through the server's consent gate. The seeded setting is off. Without consent or a configured key, the stub produces authored fallback. The grown-up switch demonstrates consent state but does not verify identity.
+The original mountain PNG, alpine visual language, Pip, code-native models, practice activities and verification infrastructure are retained. The current experience adds teaching, route consequences, visible progression, the tutor brief, durable evidence and correction behavior. Their checks are distinct from historical results in `docs/legacy/`.
 
-The Anthropic adapter uses an eight-second abort signal and returns no model text on provider/parse/network failure. Code then selects authored content. The real elapsed abort timing was not directly measured during the recorded smoke test.
-
-For a story, code first selects the skill, operation, operands, and answer. The model receives operation, operands, theme, and grade—not a learner name. Accepted story text must pass six checks: response present, required digit operands present, no additional digit numbers, no answer digit leak with operand-equality exceptions, at most 40 words, and valid generated arithmetic/range. Place-value problems have an operand-presence exception.
-
-Hints have bounded number/length checks; parent notes have presence, no-digit, and length checks. Parent counts are rendered from computed facts, separately from the note. Names can appear in a local authored parent fallback but are not sent in the model prompt.
-
-Each response carries provider, prompt version, field names sent, validation results, and final source. The UI labels accepted AI and offline content accordingly. **Accepted after checks does not mean fully validated:** these constraints do not establish that every sentence implies the correct operation, catch every written-out answer, ensure suitability, or prove learning outcomes. Aggregate latency, costs, fallback rates, and semantic quality are not yet an evaluation dashboard.
-
-## API surface
-
-| Route | Purpose |
-| --- | --- |
-| `GET /api/home`, `GET /api/health` | Demo profile, progression, effective provider and availability |
-| `POST /api/round` | Create an arithmetic round for a known skill |
-| `GET /api/round/:id` | Recover current round state, assessments, hint status, and any stored completion |
-| `POST /api/answer` | Assess one stored problem |
-| `POST /api/hint` | Mark assistance and return checked or authored guidance |
-| `POST /api/round/finish` | Collect a round completed by answering every problem or exhausting its hearts |
-| `POST /api/story` | Create a themed one-problem round, subject to rollout |
-| `GET /api/parent` | Computed arithmetic facts and separate guidance/provenance |
-| `POST /api/settings/ai-consent` | Change the demo consent setting |
-| `POST /api/comeback/apply` | Apply the existing optional comeback behavior |
-
-Strict request schemas constrain mutation payloads and the JSON body limit is 16 KB. These are input protections, not authentication. The demo also exposes event inspection, clock advance, and reset routes; they are unauthenticated and must be removed or restricted before any public multi-user deployment. The rollout flag deterministically buckets the one seeded learner; it is not evidence of an actual cohort experiment.
-
-## Journal and storage limits
-
-The report combines two sources for presentation without pretending they share an account system:
-
-- Latest completed fraction-session metrics and stored sessions come from this browser.
-- Arithmetic facts and optional parent guidance come from this local server.
-- The JSON export includes both when available, plus guidance provenance. An unavailable arithmetic report is represented by null facts in the export.
-
-The export action prepares a Blob download and displays the same JSON in a selectable dialog. The dialog was verified; external-browser file saving was not independently verified. There is no synchronization, authentication, tenant isolation, verified guardian workflow, or production rate limiting. Clearing local browser storage and resetting the server affect different records.
-
-## Verification and remaining work
-
-The [verification record](QA.md) holds the current test totals, deterministic evaluation, type/build results, browser scenarios, and remaining coverage. Run the [verification commands](../README.md#verify) against the current release. Check the assessment, hearts/bonus, recovery, consent/fallback, content-integrity, and evidence-summary scenarios there rather than treating an earlier test count as current. Individual successful live model calls do not establish overall reliability.
-
-Priorities are customer discovery, alternate fraction content and measurement, evaluating the effect of comeback and trail challenge, semantic/suitability evaluation of model language, and identity/storage/administrative boundaries before real deployment. The [product walkthrough](PRODUCT-WALKTHROUGH.md) explains the decisions and proposed metrics. The [disclosure](DISCLOSURES.md) identifies the Claude-assisted foundation and subsequent Codex iteration.
+The first equal-sharing expedition has fixed authored encounters. A successful summit check is a local transfer observation, not an unseen test or evidence of durable mastery. Actual learner usability, adult usefulness and learning outcomes remain to be measured. No real child's identity or private dataset is required to run the demonstration. [Problem, success criteria and iteration plan](PRODUCT-GUIDE.md) · [Hackathon prompt fit](PROMPT-FIT.md)

@@ -7,7 +7,7 @@
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
     "test": "vitest run",
-    "eval": "tsx src/eval.ts"
+    "eval": "node --import tsx src/eval.ts"
   },
   "dependencies": {
     "express": "^4.21.2",

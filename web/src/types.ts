@@ -74,6 +74,7 @@ export type ArithmeticFinish = {
   level?: number;
 };
 export type ArithmeticRound = {
+  practice_only?: boolean;
   round_id: string;
   level: number;
   problems: Problem[];

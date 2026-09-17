@@ -5,11 +5,24 @@ import { spawnSync } from 'node:child_process';
 
 const root = realpathSync(fileURLToPath(new URL('..', import.meta.url)));
 const issues = [];
-const required = ['.env.example', '.gitignore', '.nvmrc', '.github/workflows/ci.yml', 'LICENSE', 'package-lock.json'];
+const required = ['.env.example', '.gitignore', '.nvmrc', '.github/workflows/ci.yml', 'LICENSE', 'README.md', 'package.json', 'package-lock.json',
+  'server/package.json', 'web/package.json', 'shared/expedition.ts', 'web/test/expedition.test.ts', 'server/test/teaching.test.ts'];
 for (const name of required) {
   if (!existsSync(resolve(root, name))) issues.push(`Missing required source file: ${name}`);
 }
 if (Number(process.versions.node.split('.')[0]) < 24) issues.push('Use Node.js 24 (see .nvmrc).');
+if (existsSync(resolve(root, 'package.json')) && existsSync(resolve(root, 'package-lock.json'))) {
+  try {
+    const manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
+    const lock = JSON.parse(readFileSync(resolve(root, 'package-lock.json'), 'utf8'));
+    if (manifest.name !== lock.name || manifest.version !== lock.version
+      || manifest.name !== lock.packages?.['']?.name || manifest.version !== lock.packages?.['']?.version) {
+      issues.push('The package manifest and lockfile identify different releases.');
+    }
+    if (!manifest.scripts?.test?.includes('web/test/*.test.ts')) issues.push('The test command must include the expedition and fraction tests.');
+    if (manifest.type !== 'module') issues.push('Shared TypeScript modules require the root package type to be module.');
+  } catch { issues.push('The package manifest and lockfile must contain valid JSON.'); }
+}
 if (existsSync(resolve(root, '.env.example'))) {
   const example = readFileSync(resolve(root, '.env.example'), 'utf8');
   const key = example.match(/^ANTHROPIC_API_KEY[ \t]*=[ \t]*(.*)$/m)?.[1]?.trim();

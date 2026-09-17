@@ -5,7 +5,17 @@ import { progress, recordAnswer, recordRound } from "./progress.js";
 import { logEvent } from "./events.js";
 
 interface StoredProblem { id: string; round_id: string; learner_id: string; problem: string; used_hint: number; result: string | null; hint_response: string | null }
-interface TrailRules { hearts: number; bonus_seconds: number; bonus_points: number }
+interface TrailRules { hearts: number; bonus_seconds: number; bonus_points: number; level_shift?: -1 | 0 | 1; avoid_digit?: number | null; chosen_by?: "default" | "child" }
+// The rules a child may set. Everything else stays fixed. The server clamps; the UI only suggests.
+export interface KidRules { hearts?: 1 | 3; timer?: boolean; difficulty?: "easier" | "same" | "harder"; avoid_digit?: number | null }
+export function clampRules(kid: KidRules | undefined): Readonly<TrailRules> {
+  if (!kid) return TRAIL_RULES;
+  const hearts = kid.hearts === 1 ? 1 : 3;
+  const timer = kid.timer !== false;
+  const shift: -1 | 0 | 1 = kid.difficulty === "easier" ? -1 : kid.difficulty === "harder" ? 1 : 0;
+  const digit = Number.isInteger(kid.avoid_digit) && kid.avoid_digit! >= 0 && kid.avoid_digit! <= 9 ? kid.avoid_digit! : null;
+  return Object.freeze({ hearts, bonus_seconds: timer ? 120 : 0, bonus_points: timer ? 50 : 0, level_shift: shift, avoid_digit: digit, chosen_by: "child" as const });
+}
 interface StoredRound { id: string; learner_id: string; skill_id: string; level: number; started_at: number; result: string | null; rules: string | null; ended_at: number | null }
 interface Assessment { correct: boolean; used_hint: boolean }
 export const TRAIL_RULES: Readonly<TrailRules> = Object.freeze({ hearts: 3, bonus_seconds: 120, bonus_points: 50 });
@@ -34,9 +44,9 @@ function roundState(row: StoredRound, now: number) {
   const hearts = rules ? Math.max(0, rules.hearts - (answers.length - correct)) : null;
   const allAnswered = problems.length > 0 && answers.length === problems.length;
   const endedReason = rules && hearts === 0 ? "hearts" : allAnswered ? "completed" : null;
-  const deadline = rules ? row.started_at + rules.bonus_seconds * 1000 : null;
+  const deadline = rules && rules.bonus_seconds > 0 ? row.started_at + rules.bonus_seconds * 1000 : null;
   // Use terminal assessment time, never the later/replayed Finish request.
-  const bonus = endedReason === "completed" && rules && row.ended_at !== null && row.ended_at < deadline! ? rules.bonus_points : 0;
+  const bonus = endedReason === "completed" && rules && deadline !== null && row.ended_at !== null && row.ended_at < deadline ? rules.bonus_points : 0;
   const base = answers.reduce((sum, answer) => sum + (answer.correct ? answer.used_hint ? 60 : 100 : 0), 0);
   return {
     hearts_total: rules?.hearts ?? null, hearts_remaining: hearts,
@@ -44,6 +54,7 @@ function roundState(row: StoredRound, now: number) {
     answered: answers.length, total: problems.length, correct,
     base_score: base, bonus_points: bonus, score: base + bonus,
     round_ended: endedReason !== null, ended_reason: endedReason,
+    practice_only: rules?.level_shift === -1,
   };
 }
 
@@ -79,20 +90,27 @@ export function saveRound(learnerId: string, skillId: string, level: number,
   return getRound(learnerId, roundId);
 }
 
-export function generateRoundProblems(skillId: string, level: number, seed: number): Problem[] {
+export function generateRoundProblems(skillId: string, level: number, seed: number, avoidDigit: number | null = null, count = 7): Problem[] {
   const random = rng(seed);
   const unique = new Map<string, Problem>();
   // Bound selection for deterministic, distinct prompts at the requested level.
-  for (let attempt = 0; attempt < 512 && unique.size < 7; attempt++) {
+  for (let attempt = 0; attempt < 512 && unique.size < count; attempt++) {
     const p = generate(skillId, level, Math.floor(random() * 2 ** 32));
+    if (avoidDigit !== null && (p.prompt.includes(String(avoidDigit)) || String(p.answer).includes(String(avoidDigit)))) continue;   // the child's "no fives tonight" rule includes the correct answer
     unique.set(p.prompt, p);
   }
-  if (unique.size < 7) throw failure("This trail could not prepare enough different challenges. Please try again.", 503);
+  if (unique.size < count) {
+    if (avoidDigit !== null) throw failure("There aren't enough different questions with that digit rule at this level. Choose another digit or difficulty.");
+    throw failure("This trail could not prepare enough different challenges. Please try again.", 503);
+  }
   return [...unique.values()];
 }
-export function startRound(learnerId: string, skillId: string) {
-  const level = currentLevel(learnerId, skillId);
-  return saveRound(learnerId, skillId, level, generateRoundProblems(skillId, level, randomInt(1, 2 ** 31)), TRAIL_RULES);
+export function startRound(learnerId: string, skillId: string, kid?: KidRules) {
+  const rules = clampRules(kid);
+  // Played level may shift by one at the child's request. Mastery level never moves here:
+  // recordAnswer only counts a run when the assessed level is at or above the current level.
+  const level = Math.max(1, Math.min(10, currentLevel(learnerId, skillId) + (rules.level_shift ?? 0)));
+  return saveRound(learnerId, skillId, level, generateRoundProblems(skillId, level, randomInt(1, 2 ** 31), rules.avoid_digit ?? null), rules);
 }
 export function getProblem(learnerId: string, problemId: string): StoredProblem {
   const row = db.prepare("SELECT * FROM problems WHERE id=? AND learner_id=?").get(problemId, learnerId) as StoredProblem | undefined;
@@ -114,9 +132,18 @@ export const submitAnswer = db.transaction((learnerId: string, problemId: string
   requireOpenRound(round, now);
   const p = JSON.parse(row.problem) as Problem;
   const correct = submitted === p.answer;
+  const usedHint = row.used_hint === 1;
+  const practiceOnly = round.rules !== null && (JSON.parse(round.rules) as TrailRules).level_shift === -1;
+  const current = progress(learnerId).find((s) => s.skill_id === p.skill_id)!;
+  // Easier mode remains practice even at the level-1 floor. It does not add to
+  // or erase the independent run the learner has already earned.
+  const answerProgress = practiceOnly
+    ? { level: current.level, run: current.run, unlocked: false }
+    : recordAnswer(learnerId, p.skill_id, correct, usedHint, p.level);
+  if (practiceOnly) logEvent("answer", { learner_id: learnerId, payload: { skill_id: p.skill_id, correct, used_hint: usedHint, level: answerProgress.level, assessed_level: p.level, unlocked: false, practice_only: true } });
   const assessment = {
-    problem_id: problemId, correct, expected_answer: p.answer, used_hint: row.used_hint === 1,
-    ...recordAnswer(learnerId, p.skill_id, correct, row.used_hint === 1, p.level),
+    problem_id: problemId, correct, expected_answer: p.answer, used_hint: usedHint,
+    ...answerProgress,
   };
   db.prepare("UPDATE problems SET result=? WHERE id=?").run(JSON.stringify(assessment), problemId);
   if (roundState(round, now).round_ended) {

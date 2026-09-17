@@ -1,0 +1,999 @@
+/* Small, finite demonstrations; no learner state or assessment is involved. */
+.modal:has(.quick-tutorial) {
+  width: min(570px, calc(100vw - 24px));
+  padding: 24px 28px 15px;
+  background: linear-gradient(160deg, #213b3c, #14282f 72%);
+  overflow-y: auto;
+}
+.modal:has(.quick-tutorial) .modal-heading {
+  margin-bottom: 13px;
+}
+.modal:has(.quick-tutorial) .modal-heading h2 {
+  font-size: 24px;
+  line-height: 1.18;
+}
+.quick-tutorial {
+  color: #f0f3e9;
+}
+.quick-tutorial button {
+  touch-action: manipulation;
+}
+.quick-tutorial button:focus-visible {
+  outline: 3px solid #d1f5c8;
+  outline-offset: 3px;
+}
+.qt-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  color: #b7d1c8;
+}
+.qt-intro > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.qt-intro > b {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.qt-step-copy {
+  min-height: 112px;
+  padding: 18px 0 13px;
+}
+.quick-tutorial .qt-step-copy h3 {
+  font-size: 24px;
+  line-height: 1.12;
+  letter-spacing: -0.7px;
+  margin-bottom: 9px;
+  color: #f0f3e9;
+}
+.quick-tutorial .qt-step-copy p {
+  font-size: 15px;
+  line-height: 1.5;
+  color: #bfcdc6;
+}
+.qt-demo {
+  margin: 0;
+  border: 1px solid #c9e3c326;
+  background: #0b1c2359;
+  border-radius: 18px;
+  overflow: hidden;
+}
+.qt-demo-screen {
+  padding: 14px 20px;
+  min-height: 230px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  isolation: isolate;
+  background: radial-gradient(ellipse at 50% 60%, #47745240, transparent 70%);
+}
+.qt-demo-screen::before,
+.qt-demo-screen::after {
+  content: "";
+  position: absolute;
+  width: 72%;
+  height: 90px;
+  bottom: 0;
+  background: #aac3a707;
+  clip-path: polygon(0 100%, 35% 0, 52% 55%, 74% 20%, 100% 100%);
+  z-index: -1;
+}
+.qt-demo-screen::before {
+  left: -8%;
+}
+.qt-demo-screen::after {
+  right: -7%;
+  transform: scaleX(-1);
+}
+.qt-demo-screen > div {
+  width: 100%;
+}
+.qt-demo figcaption {
+  border-top: 1px solid #c9e3c31c;
+  padding: 12px 16px;
+  color: #c2d6c7;
+  background: #bad5b406;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.qt-scene-label {
+  display: block;
+  text-align: center;
+  color: #a9c9b5;
+  font-size: 10px;
+  letter-spacing: 1.3px;
+  line-height: 1.5;
+  margin-bottom: 13px;
+}
+.qt-teach-choose,
+.qt-prediction-example,
+.qt-share-example,
+.qt-teach-finish,
+.qt-fraction-example,
+.qt-number-example,
+.qt-number-finish {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.qt-method-label {
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #c5e7b95c;
+  background: #c5e7b914;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.qt-fixed-plan {
+  padding: 17px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 11px;
+  font-size: 14px;
+  color: #c3d6ca;
+}
+.qt-stepper {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.qt-stepper > span {
+  width: 47px;
+  height: 42px;
+  display: grid;
+  place-content: center;
+  border-radius: 10px;
+  color: #d0efbf;
+  background: #49624f66;
+  font-size: 24px;
+}
+.qt-number-switch {
+  position: relative;
+  width: 60px;
+  height: 48px;
+  display: grid;
+  place-content: center;
+  font-size: 43px;
+  font-weight: 500;
+  color: #f2f5de;
+}
+.qt-number-switch i {
+  font-style: normal;
+}
+.qt-before,
+.qt-after {
+  grid-area: 1 / 1;
+}
+.qt-before {
+  animation: qt-old-away 3.6s both;
+}
+.qt-after {
+  animation: qt-new-here 3.6s both;
+}
+.qt-tap-target {
+  position: relative;
+}
+.qt-pointer {
+  position: absolute;
+  width: 22px;
+  height: 29px;
+  right: -5px;
+  bottom: -20px;
+  filter: drop-shadow(1px 3px 2px #041a2070);
+  z-index: 5;
+  pointer-events: none;
+  animation: qt-point-and-tap 3.6s both;
+}
+.qt-demo-focus {
+  animation: qt-focus 3.6s both;
+}
+.qt-owl {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  max-width: 340px;
+  margin-bottom: 17px;
+}
+.qt-owl .owl {
+  width: 65px;
+  height: 65px;
+  flex-shrink: 0;
+}
+.qt-owl > span {
+  border: 1px solid #c4dfb838;
+  background: #8aad8112;
+  border-radius: 13px 13px 13px 3px;
+  padding: 12px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+.qt-example-select {
+  width: 100%;
+  max-width: 300px;
+  display: grid;
+  grid-template-columns: 1fr 15px;
+  font-size: 14px;
+  padding: 14px 16px;
+  border: 1px solid #c1deb057;
+  border-radius: 10px;
+  background: #11282c;
+}
+.qt-example-select > b {
+  grid-column: 2;
+  grid-row: 1;
+  color: #d1eac1;
+}
+.qt-example-select .qt-pointer {
+  right: 7px;
+}
+.qt-example-note {
+  font-size: 12px;
+  color: #99b3a7;
+  margin-top: 15px;
+}
+.qt-example-action {
+  font-size: 13px;
+  min-height: 38px;
+  padding: 9px 13px;
+  border-radius: 9px;
+  display: inline-flex;
+  gap: 9px;
+  align-items: center;
+  background: #c4e8b6;
+  color: #1c362d;
+  font-weight: 600;
+}
+.qt-share-example {
+  gap: 12px;
+}
+.qt-basket {
+  position: relative;
+  min-width: 157px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid #c8a67955;
+  border-radius: 7px 7px 30px 30px;
+  padding: 5px 16px 9px;
+  background: repeating-linear-gradient(
+    0deg,
+    #90734712 0px 4px,
+    #90734722 4px 6px
+  );
+}
+.qt-basket > span {
+  font-size: 10px;
+  color: #cdbb9b;
+  margin-bottom: 3px;
+}
+.qt-basket-berries {
+  display: flex;
+  min-height: 25px;
+}
+.qt-berry {
+  width: 21px;
+  height: 23px;
+  flex-shrink: 0;
+}
+.qt-basket-berries .qt-berry {
+  animation: qt-berry-out 3.6s both;
+  animation-delay: calc(var(--berry-order) * 100ms);
+}
+.qt-empty-basket {
+  position: absolute;
+  bottom: 14px;
+  font-size: 12px;
+  color: #c9e0b1;
+  animation: qt-complete-in 4s both;
+}
+.qt-friends {
+  display: flex;
+  width: 100%;
+  max-width: 300px;
+  justify-content: space-between;
+  gap: 12px;
+}
+.qt-friend {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.qt-friend > .owl {
+  width: 47px;
+  height: 47px;
+}
+.qt-friend:nth-child(2) > .owl {
+  filter: hue-rotate(35deg);
+}
+.qt-friend:nth-child(3) > .owl {
+  filter: hue-rotate(-25deg);
+}
+.qt-friend > span {
+  font-size: 11px;
+  color: #c1d2c5;
+}
+.qt-bowl {
+  min-width: 71px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 3px solid #b5caab55;
+  border-radius: 5px 5px 18px 18px;
+  padding: 4px 4px 5px;
+}
+.qt-bowl > * {
+  animation: qt-berry-in 3.6s both;
+  animation-delay: calc(var(--friend-order) * 350ms);
+}
+.qt-bowl b {
+  margin-left: 3px;
+  font-size: 13px;
+  color: #d0e4bd;
+}
+.qt-teach-finish {
+  gap: 14px;
+  padding: 2px 0;
+  text-align: center;
+}
+.qt-success-seal {
+  display: grid;
+  place-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  color: #d0edbd;
+  background: #abc99722;
+  border: 1px solid #d0edbd45;
+  animation: qt-success-in 0.6s both;
+}
+.qt-teach-finish > strong,
+.qt-number-finish > strong {
+  color: #def0cc;
+  font-size: 20px;
+  font-weight: 500;
+}
+.qt-result-bowls {
+  display: flex;
+  gap: 24px;
+}
+.qt-result-bowls > div {
+  display: flex;
+  flex-wrap: wrap;
+  width: 52px;
+  justify-content: center;
+}
+.qt-result-bowls span {
+  width: 100%;
+  font-size: 11px;
+  margin-top: 4px;
+  color: #a9c1b1;
+}
+.qt-world-change {
+  border-top: 1px solid #bfd3ad24;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  font-size: 13px;
+  color: #cdbf94;
+  padding-top: 13px;
+}
+.qt-target {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  padding: 8px 16px;
+  border: 1px solid #e9daa642;
+  border-radius: 10px;
+  background: #b6a16d0c;
+}
+.qt-target > span:first-child {
+  color: #d5c697;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+.qt-fraction {
+  display: inline-grid;
+  text-align: center;
+  min-width: 24px;
+  font-size: 21px;
+  color: #e1edcb;
+  line-height: 1.1;
+}
+.qt-fraction b {
+  font-weight: 500;
+  padding: 1px 4px;
+}
+.qt-fraction b:first-child {
+  border-bottom: 1.5px solid currentColor;
+}
+.qt-target-parts {
+  display: flex;
+  width: 65px;
+  height: 25px;
+  border: 1px solid #bccd9566;
+}
+.qt-target-parts > i {
+  width: 20%;
+  border-right: 1px solid #10282a;
+}
+.qt-target-parts > i.qt-shaded {
+  background: #c9d69b;
+}
+.qt-tower {
+  width: 230px;
+  margin: 2px 0 8px;
+  position: relative;
+  filter: drop-shadow(0 8px 9px #06191960);
+}
+.qt-beacon {
+  width: 65px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: auto;
+  color: #99b38d;
+  background: #28453c;
+  border-radius: 30px 30px 0 0;
+  border: 1px solid #d2e5b43b;
+  border-bottom: 0;
+}
+.qt-beacon-lit {
+  color: #fff1b0;
+  animation: qt-beacon-light 3.6s both;
+}
+.qt-ring {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 45px;
+  padding: 4px 10px;
+  border: 1px solid #b1c29350;
+  background: linear-gradient(90deg, #314938, #435943 46%, #2b473b);
+  border-radius: 9px;
+  box-shadow: 0 4px 0 #0e2524;
+  margin-bottom: 4px;
+}
+.qt-ring + .qt-ring {
+  background: linear-gradient(90deg, #264a43, #34584a 46%, #26433d);
+}
+.qt-ring:last-child {
+  background: linear-gradient(90deg, #273f40, #354e4b 46%, #1f3e3b);
+}
+.qt-mock-arrow {
+  height: 30px;
+  width: 28px;
+  display: grid;
+  place-content: center;
+  color: #cbdeb8;
+  background: #0e272833;
+  border-radius: 5px;
+  font-size: 23px;
+  line-height: 1;
+}
+.qt-fraction-switch {
+  display: grid;
+  min-height: 47px;
+  place-items: center;
+}
+.qt-fraction-switch > span {
+  display: flex;
+}
+.qt-parts {
+  display: grid;
+  width: 105px;
+  gap: 3px;
+  height: 23px;
+}
+.qt-parts i {
+  border: 1px solid #c9e2b74d;
+  border-radius: 3px;
+  background: #182e2f4d;
+}
+.qt-parts i.qt-shaded {
+  background: #c4dba6;
+  border-color: #e1ecc9;
+}
+.qt-numberline {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  width: 106px;
+  height: 27px;
+  align-items: flex-end;
+  border-top: 2px solid #b4cda8;
+  margin-top: 8px;
+}
+.qt-numberline::before,
+.qt-numberline::after {
+  content: "";
+  width: 2px;
+  height: 9px;
+  position: absolute;
+  top: -5px;
+  background: #b4cda8;
+}
+.qt-numberline::before {
+  left: 0;
+}
+.qt-numberline::after {
+  right: 0;
+}
+.qt-numberline small {
+  font-size: 10px;
+  line-height: 1;
+  color: #c4d8b6;
+}
+.qt-numberline i {
+  top: -6px;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e2efba;
+  position: absolute;
+  box-shadow: 0 0 0 4px #dff0b719;
+}
+.qt-teaching-tower {
+  width: 218px;
+}
+.qt-teaching-tower .qt-beacon {
+  height: 26px;
+}
+.qt-teaching-tower .qt-ring {
+  min-height: 36px;
+}
+.qt-teaching-tower .qt-fraction-switch {
+  min-height: 42px;
+}
+.qt-number-example {
+  gap: 12px;
+  padding: 4px 0;
+}
+.qt-equation {
+  font-size: 32px;
+  letter-spacing: -1px;
+  color: #ecf1d9;
+}
+.qt-counting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 15px 0 7px;
+}
+.qt-counting > span {
+  display: flex;
+  padding: 10px 7px;
+  border: 1px solid #b0c59630;
+  border-radius: 12px;
+  gap: 2px;
+}
+.qt-counting > b {
+  color: #c4d9ac;
+  font-size: 20px;
+  font-weight: 400;
+}
+.qt-counting > strong {
+  font-size: 25px;
+  color: #e2ebcb;
+}
+.qt-answer {
+  width: 165px;
+  height: 43px;
+  border: 1px solid #c9dfb345;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: #102326;
+}
+.qt-answer > span {
+  font-size: 13px;
+  color: #a6b9b1;
+}
+.qt-answer > strong {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 26px;
+  font-weight: 500;
+  color: #e7f1d2;
+}
+.qt-answer-correct {
+  border-color: #c5e4b8;
+}
+.qt-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  width: 165px;
+}
+.qt-keypad > span {
+  min-height: 29px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #a7c6ab30;
+  border-radius: 6px;
+  background: #7b9b7720;
+  color: #dfebd4;
+  font-size: 13px;
+}
+.qt-keypad > span:last-child {
+  background: #c1dfb0;
+  color: #24402e;
+  font-size: 21px;
+}
+.qt-story-example {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 330px;
+  text-align: center;
+  gap: 8px;
+}
+.quick-tutorial .qt-story-example p {
+  font-size: 16px;
+  color: #d4e1ce;
+  line-height: 1.4;
+}
+.qt-story-example > svg {
+  color: #c8dd9f;
+}
+.qt-story-example > span {
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #adc2b0;
+}
+.qt-number-finish {
+  text-align: center;
+  gap: 14px;
+}
+.quick-tutorial .qt-number-finish > p {
+  font-size: 27px;
+  color: #d9e6c7;
+}
+.qt-help-example {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #b7ccb7;
+}
+.qt-help-example .owl {
+  width: 35px;
+  height: 35px;
+}
+.qt-demonstration-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: #a9bfb1;
+}
+.qt-demonstration-controls button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px 0 10px;
+  font-size: 12px;
+  color: #d3e6c4;
+}
+.qt-step-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  margin: -3px 0 5px;
+}
+.qt-step-navigation button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  display: grid;
+  place-items: center;
+}
+.qt-step-navigation button span {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #95b09b45;
+  border-radius: 50%;
+  font-size: 11px;
+  color: #a9c2b1;
+}
+.qt-step-navigation button[aria-current="step"] span {
+  color: #20382b;
+  background: #c5e4b7;
+  border-color: #d4eac4;
+  box-shadow: 0 0 0 4px #c5e4b70d;
+}
+.qt-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 12px;
+}
+.quick-tutorial .qt-actions .button {
+  min-height: 46px;
+  font-size: 14px;
+  justify-content: center;
+  padding: 10px 13px;
+  gap: 9px;
+}
+.qt-skip {
+  display: block;
+  width: fit-content;
+  margin: 6px auto 0;
+  min-height: 40px;
+  padding: 8px 18px;
+  font-size: 12px;
+  color: #adc3b5;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+@keyframes qt-old-away {
+  0%,
+  34% {
+    opacity: 1;
+  }
+  43%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes qt-new-here {
+  0%,
+  34% {
+    opacity: 0;
+  }
+  43%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes qt-point-and-tap {
+  0% {
+    opacity: 0;
+    transform: translate(12px, 14px);
+  }
+  13%,
+  28% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  34% {
+    opacity: 1;
+    transform: scale(0.86);
+  }
+  41%,
+  64% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  82%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes qt-focus {
+  0%,
+  24%,
+  100% {
+    box-shadow: 0 0 0 0 #e4edac00;
+  }
+  34%,
+  43% {
+    box-shadow: 0 0 0 5px #e4edac55;
+  }
+  65% {
+    box-shadow: 0 0 0 9px #e4edac00;
+  }
+}
+@keyframes qt-berry-out {
+  0%,
+  32% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  52%,
+  100% {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+}
+@keyframes qt-berry-in {
+  0%,
+  40% {
+    opacity: 0;
+    transform: translateY(-7px);
+  }
+  58%,
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes qt-complete-in {
+  0%,
+  76% {
+    opacity: 0;
+  }
+  92%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes qt-success-in {
+  from {
+    opacity: 0;
+    transform: scale(0.87);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes qt-beacon-light {
+  0%,
+  38% {
+    background: #28453c;
+    box-shadow: none;
+  }
+  53%,
+  100% {
+    background: #9a8c444d;
+    box-shadow: 0 0 25px #e8da6c50;
+  }
+}
+.qt-reduced-motion *,
+.qt-reduced-motion *::before,
+.qt-reduced-motion *::after {
+  animation: none !important;
+  transition: none !important;
+}
+.qt-reduced-motion :is(.qt-before, .qt-pointer, .qt-basket-berries .qt-berry) {
+  opacity: 0;
+}
+.qt-reduced-motion :is(.qt-after, .qt-empty-basket, .qt-bowl > *) {
+  opacity: 1;
+}
+.qt-reduced-motion .qt-beacon-lit {
+  background: #9a8c444d;
+  box-shadow: 0 0 18px #e8da6c35;
+}
+@media (prefers-reduced-motion: reduce) {
+  .quick-tutorial *,
+  .quick-tutorial *::before,
+  .quick-tutorial *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .quick-tutorial :is(.qt-before, .qt-pointer, .qt-basket-berries .qt-berry) {
+    opacity: 0;
+  }
+  .quick-tutorial :is(.qt-after, .qt-empty-basket, .qt-bowl > *) {
+    opacity: 1;
+  }
+  .quick-tutorial .qt-beacon-lit {
+    background: #9a8c444d;
+    box-shadow: 0 0 18px #e8da6c35;
+  }
+}
+@media (max-width: 520px) {
+  .modal:has(.quick-tutorial) {
+    padding: 18px 18px 10px;
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+  }
+  .modal:has(.quick-tutorial) .modal-heading h2 {
+    font-size: 21px;
+  }
+  .quick-tutorial .qt-step-copy h3 {
+    font-size: 22px;
+  }
+  .quick-tutorial .qt-step-copy p {
+    font-size: 14px;
+  }
+  .qt-step-copy {
+    min-height: 112px;
+    padding-top: 15px;
+  }
+  .qt-demo-screen {
+    padding: 12px 14px;
+    min-height: 217px;
+  }
+  .qt-demo figcaption {
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+  .qt-intro {
+    font-size: 10px;
+  }
+  .qt-intro > span {
+    gap: 5px;
+  }
+  .qt-demonstration-controls {
+    font-size: 10px;
+  }
+  .qt-step-navigation {
+    margin-bottom: 1px;
+  }
+  .qt-counting {
+    gap: 8px;
+  }
+  .qt-counting > span {
+    padding: 8px 4px;
+  }
+  .qt-counting > strong {
+    font-size: 22px;
+  }
+  .qt-demo-screen .qt-counting .qt-berry {
+    width: 20px;
+  }
+  .qt-actions {
+    gap: 9px;
+  }
+  .qt-tower {
+    width: 216px;
+  }
+  .qt-teaching-tower {
+    width: 210px;
+  }
+}
+
+.qt-confirm-example {
+  margin: 5px 0 7px;
+}
+.qt-confirm-example .qt-pointer {
+  animation-delay: 1.2s;
+}
+
+.qt-parts-changing .qt-shaded:nth-child(n + 4) {
+  animation: qt-shade-part 3.6s both;
+}
+.qt-numberline .qt-point-changing {
+  animation: qt-point-move 3.6s both;
+}
+@keyframes qt-shade-part {
+  0%,
+  35% {
+    background: #182e2f4d;
+    border-color: #c9e2b74d;
+  }
+  45%,
+  100% {
+    background: #c4dba6;
+    border-color: #e1ecc9;
+  }
+}
+@keyframes qt-point-move {
+  0%,
+  35% {
+    left: 30%;
+  }
+  48%,
+  100% {
+    left: 60%;
+  }
+}

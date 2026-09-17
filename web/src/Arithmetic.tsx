@@ -1,6 +1,27 @@
 import { useEffect, useRef, useState } from "react";
-import type { Skill, Problem, Provenance, ArithmeticRound, ArithmeticAssessment, ArithmeticFinish } from "./types";
-import { api, Icon, Button, Owl, chime, speak, Modal, readLocal, saveLocal } from "./ui";
+import { QuickTutorial } from "./QuickTutorial";
+import { loadRules } from "./Homework";
+import { ActionBeacon } from "./ActionBeacon";
+import "./legacy-guidance.css";
+import type {
+  Skill,
+  Problem,
+  Provenance,
+  ArithmeticRound,
+  ArithmeticAssessment,
+  ArithmeticFinish,
+} from "./types";
+import {
+  api,
+  Icon,
+  Button,
+  Owl,
+  chime,
+  speak,
+  Modal,
+  readLocal,
+  saveLocal,
+} from "./ui";
 const THEMES = [
   {
     id: "space",
@@ -31,12 +52,14 @@ export default function Arithmetic({
   skill,
   story,
   sound,
+  reducedMotion = false,
   onExit,
   onDone,
 }: {
   skill: Skill;
   story: boolean;
   sound: boolean;
+  reducedMotion?: boolean;
   onExit: () => void;
   onDone: () => void;
 }) {
@@ -55,13 +78,18 @@ export default function Arithmetic({
     [visual, setVisual] = useState(false),
     [resumed, setResumed] = useState(false),
     [recoveredAssessment, setRecoveredAssessment] = useState(false),
-    [now, setNow] = useState(Date.now());
+    [now, setNow] = useState(Date.now()),
+    [tutorial, setTutorial] = useState(true),
+    [introDone, setIntroDone] = useState(false),
+    [themeChosen, setThemeChosen] = useState(false);
   const storageKey = `summit.arithmetic.active.${skill.id}`;
   const loadRef = useRef<Promise<ArithmeticRound> | null>(null),
     lock = useRef(false),
     retryRef = useRef<(() => Promise<void>) | null>(null),
     clockAnchor = useRef({ server: Date.now(), local: performance.now() });
   const input = useRef<HTMLInputElement>(null);
+  const freshAfterTutorial = useRef(false);
+  const [guidanceSessionId] = useState(() => crypto.randomUUID());
 
   const rememberFinish = (r: ArithmeticFinish) => {
     setFinished(r);
@@ -74,33 +102,44 @@ export default function Arithmetic({
   };
   const restoreRound = (r: ArithmeticRound, wasSaved: boolean) => {
     const assessments = r.assessments || [];
-    const firstOpen = r.problems.findIndex((p) => !assessments.some((a) => a.problem_id === p.id));
+    const firstOpen = r.problems.findIndex(
+      (p) => !assessments.some((a) => a.problem_id === p.id),
+    );
     const last = r.round_ended ? assessments.at(-1) : undefined;
     const index = last
       ? r.problems.findIndex((p) => p.id === last.problem_id)
       : Math.max(0, firstOpen);
-    const hadHint = r.hinted_problem_ids?.includes(r.problems[index]?.id) || false;
-    setData({ ...r, current_level: r.current_level ?? r.level, run: r.run ?? (wasSaved ? 0 : skill.run) });
+    const hadHint =
+      r.hinted_problem_ids?.includes(r.problems[index]?.id) || false;
+    setData({
+      ...r,
+      current_level: r.current_level ?? r.level,
+      run: r.run ?? (wasSaved ? 0 : skill.run),
+    });
     setI(Math.max(0, index));
     setEntry("");
     setResult(last || null);
     setHint("");
     setHintUsed(hadHint);
-    setVisual(hadHint || !!last && !last.correct);
+    setVisual(hadHint || (!!last && !last.correct));
     setRecoveredAssessment(!!last);
     setResumed(wasSaved && !r.result);
     setFinished(r.result || null);
     // Only fresh round/snapshot responses synchronize this clock. An answer
     // replay contains its original timestamp and must not rewind the window.
-    clockAnchor.current = { server: r.server_now ?? Date.now(), local: performance.now() };
+    clockAnchor.current = {
+      server: r.server_now ?? Date.now(),
+      local: performance.now(),
+    };
     setNow(clockAnchor.current.server);
-    if (!story) saveLocal(storageKey, r.result ? null : { round_id: r.round_id });
+    if (!story)
+      saveLocal(storageKey, r.result ? null : { round_id: r.round_id });
   };
   const requestRound = async () => {
     const saved = readLocal<{ round_id?: string } | null>(storageKey, null);
     return saved?.round_id
       ? api(`/round/${encodeURIComponent(saved.round_id)}`)
-      : api("/round", { skill_id: skill.id });
+      : api("/round", { skill_id: skill.id, rules: loadRules(skill.id) });
   };
   const perform = async (action: () => Promise<void>) => {
     if (lock.current) return;
@@ -112,28 +151,49 @@ export default function Arithmetic({
       await action();
       retryRef.current = null;
     } catch (e) {
-      setError((e as Error).message || "The connection took a little detour. Try again to pick up here.");
+      setError(
+        (e as Error).message ||
+          "The connection took a little detour. Try again to pick up here.",
+      );
     } finally {
       lock.current = false;
       setBusy(false);
     }
   };
   const recoverRound = async () => {
-    const saved = !!readLocal<{ round_id?: string } | null>(storageKey, null)?.round_id;
+    const saved = !!readLocal<{ round_id?: string } | null>(storageKey, null)
+      ?.round_id;
     const r = await requestRound();
     restoreRound(r, saved);
     if (r.round_ended && !r.result) await finishRound(r.round_id, false);
   };
-  const startFresh = () => void perform(async () => {
-    const r = await api("/round", { skill_id: skill.id });
-    restoreRound(r, false);
-    window.scrollTo({ top: 0, behavior: "instant" });
-  });
+  const createFresh = () =>
+    void perform(async () => {
+      const r = await api("/round", { skill_id: skill.id, rules: loadRules(skill.id) });
+      restoreRound(r, false);
+      window.scrollTo({ top: 0, behavior: "instant" });
+    });
+
+  const startFresh = () => {
+    freshAfterTutorial.current = true;
+    setTutorial(true);
+  };
+  const closeTutorial = () => {
+    setTutorial(false);
+    setIntroDone(true);
+    if (freshAfterTutorial.current) {
+      freshAfterTutorial.current = false;
+      createFresh();
+    }
+  };
 
   useEffect(() => {
-    if (story) return;
+    // A new round (and its server-owned bonus window) starts only after the
+    // child has finished or skipped the demonstration.
+    if (story || !introDone) return;
     let active = true;
-    const saved = !!readLocal<{ round_id?: string } | null>(storageKey, null)?.round_id;
+    const saved = !!readLocal<{ round_id?: string } | null>(storageKey, null)
+      ?.round_id;
     lock.current = true;
     setBusy(true);
     loadRef.current ??= requestRound();
@@ -162,17 +222,30 @@ export default function Arithmetic({
     return () => {
       active = false;
     };
-  }, [skill.id, story]);
+  }, [skill.id, story, introDone]);
   useEffect(() => {
-    if (story || !data?.bonus_deadline_at || data.round_ended || finished) return;
-    const tick = () => setNow(clockAnchor.current.server + performance.now() - clockAnchor.current.local);
+    if (story || !data?.bonus_deadline_at || data.round_ended || finished)
+      return;
+    const tick = () =>
+      setNow(
+        clockAnchor.current.server +
+          performance.now() -
+          clockAnchor.current.local,
+      );
     tick();
     const timer = window.setInterval(tick, 1000);
     return () => window.clearInterval(timer);
-  }, [story, data?.round_id, data?.bonus_deadline_at, data?.round_ended, finished]);
+  }, [
+    story,
+    data?.round_id,
+    data?.bonus_deadline_at,
+    data?.round_ended,
+    finished,
+  ]);
   useEffect(() => {
-    if (data && !busy && !result && !finished && !error) input.current?.focus({ preventScroll: true });
-  }, [data?.round_id, i, busy, result, finished, error]);
+    if (data && !busy && !result && !finished && !error && !tutorial)
+      input.current?.focus({ preventScroll: true });
+  }, [data?.round_id, i, busy, result, finished, error, tutorial]);
   const makeStory = async () => {
     await perform(async () => {
       const r = await api("/story", { skill_id: skill.id, theme });
@@ -182,7 +255,8 @@ export default function Arithmetic({
   };
   const p = data?.problems[i];
   const askHint = async () => {
-    if (!p || lock.current || hint || result || data?.round_ended || error) return;
+    if (!p || lock.current || hint || result || data?.round_ended || error)
+      return;
     await perform(async () => {
       const r = await api("/hint", { problem_id: p.id });
       setHint(r.hint);
@@ -191,25 +265,38 @@ export default function Arithmetic({
     });
   };
   const submit = async () => {
-    if (!p || !entry || result || lock.current || data?.round_ended || error) return;
+    if (!p || !entry || result || lock.current || data?.round_ended || error)
+      return;
     await perform(async () => {
       const r: ArithmeticAssessment = await api("/answer", {
         problem_id: p.id,
         answer: Number(entry),
       });
       setResult(r);
-      setData((previous) => previous ? {
-        ...previous,
-        current_level: r.level,
-        run: r.run,
-        hearts_remaining: r.hearts_remaining ?? previous.hearts_remaining,
-        round_ended: r.round_ended,
-        ended_reason: r.ended_reason,
-        answered: r.answered ?? i + 1,
-        score: r.score ?? (previous.score || 0) + (r.correct ? r.used_hint ? 60 : 100 : 0),
-        bonus_points: r.bonus_points ?? 0,
-        assessments: [...(previous.assessments || []).filter((a) => a.problem_id !== r.problem_id), r],
-      } : previous);
+      setData((previous) =>
+        previous
+          ? {
+              ...previous,
+              current_level: r.level,
+              run: r.run,
+              hearts_remaining: r.hearts_remaining ?? previous.hearts_remaining,
+              round_ended: r.round_ended,
+              ended_reason: r.ended_reason,
+              answered: r.answered ?? i + 1,
+              score:
+                r.score ??
+                (previous.score || 0) +
+                  (r.correct ? (r.used_hint ? 60 : 100) : 0),
+              bonus_points: r.bonus_points ?? 0,
+              assessments: [
+                ...(previous.assessments || []).filter(
+                  (a) => a.problem_id !== r.problem_id,
+                ),
+                r,
+              ],
+            }
+          : previous,
+      );
       if (r.correct) chime(sound);
       else setVisual(true);
     });
@@ -230,12 +317,44 @@ export default function Arithmetic({
     }
   };
   const hasHearts = !story && data?.hearts_total != null;
-  const remaining = data?.bonus_deadline_at ? Math.max(0, Math.ceil((data.bonus_deadline_at - now) / 1000)) : 0;
+  const remaining = data?.bonus_deadline_at
+    ? Math.max(0, Math.ceil((data.bonus_deadline_at - now) / 1000))
+    : 0;
   const bonusEarned = (data?.bonus_points || 0) > 0;
   const currentLevel = data?.current_level ?? data?.level ?? skill.level;
   const stopped = finished?.ended_reason === "hearts";
+  const choosingWorld = story && !data;
+  const guideStep = choosingWorld
+    ? themeChosen
+      ? 1
+      : 0
+    : result
+      ? 2
+      : entry
+        ? 1
+        : 0;
+  const beaconTarget = choosingWorld
+    ? themeChosen
+      ? ".story-make-adventure"
+      : ".story-world-choices"
+    : result
+      ? ".arithmetic-next"
+      : entry
+        ? ".arithmetic-stage .pad-enter"
+        : ".arithmetic-stage #answer";
+  const beaconMessage = choosingWorld
+    ? themeChosen
+      ? "Your world is ready. Tap here to make your adventure."
+      : "Which world would you like? Tap a picture to choose."
+    : result
+      ? "Your result is ready. Tap here for the next step."
+      : entry
+        ? "Ready to try your answer? Tap this arrow to check it."
+        : "Tap here and type your answer, or use the number buttons below.";
   return (
-    <div className={`game-page arithmetic-game ${story ? "story-game" : "arithmetic-trail"}`}>
+    <div
+      className={`game-page arithmetic-game ${story ? "story-game" : "arithmetic-trail"}`}
+    >
       <div className="game-toolbar">
         <button
           className="back-button"
@@ -249,28 +368,76 @@ export default function Arithmetic({
             ? "STORY EXPEDITION"
             : `GRADE ${skill.grade} · LEVEL ${data?.level ?? skill.level}`}
         </span>
-        <span className="small muted">
-          {data
-            ? `${Math.min(i + 1, data.problems.length)} / ${data.problems.length} stops`
-            : "YOUR WORLD. YOUR STORY."}
-        </span>
+        <div className="legacy-toolbar-end">
+          <span className="small muted">
+            {data
+              ? `${Math.min(i + 1, data.problems.length)} / ${data.problems.length} stops`
+              : story
+                ? "YOUR WORLD. YOUR STORY."
+                : "YOUR TRAIL. YOUR PACE."}
+          </span>
+          <button
+            className="text-button legacy-help-button"
+            onClick={() => setTutorial(true)}
+            disabled={busy}
+          >
+            <Icon name="help" size={17} /> Show me how
+          </button>
+        </div>
       </div>
+      {!finished && (
+        <div className="legacy-action-guide" aria-label="Your next steps">
+          <div className="legacy-guide-heading">
+            <Icon name="compass" size={18} />
+            <strong>
+              {choosingWorld ? "Make your story" : "One little step at a time"}
+            </strong>
+          </div>
+          <ol>
+            {(choosingWorld
+              ? [
+                  "Tap a world you want to explore.",
+                  "Tap ‘Make my adventure’ to begin.",
+                  "Read the story, then enter your answer.",
+                ]
+              : [
+                  story
+                    ? "Read the story. Use the numbers to enter your answer."
+                    : "Look at the problem. Use the numbers to enter your answer.",
+                  "Tap the arrow on the keypad to check.",
+                  "Read Pip’s feedback, then tap the next step.",
+                ]
+            ).map((text, index) => (
+              <li
+                key={text}
+                className={guideStep === index ? "current" : ""}
+                aria-current={guideStep === index ? "step" : undefined}
+              >
+                <span>{index + 1}</span>
+                {text}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
       {finished ? (
         <section className={`summit-finish ${stopped ? "trail-rest" : ""}`}>
           <div className="summit-medal">
             <Icon name={stopped ? "leaf" : "flag"} size={60} />
           </div>
-          <div className="eyebrow">{stopped ? "A BREATHER AT BASECAMP" : "ANOTHER LITTLE ADVENTURE"}</div>
+          <div className="eyebrow">
+            {stopped ? "A BREATHER AT BASECAMP" : "ANOTHER LITTLE ADVENTURE"}
+          </div>
           <h1>
             {stopped
               ? "A little rest.\nA fresh start."
               : finished.correct === finished.total
-              ? "Look at you go."
-              : "A little more practice.\nA little more possibility."}
+                ? "Look at you go."
+                : "A little more practice.\nA little more possibility."}
           </h1>
           <p>
             {stopped
-              ? `All three hearts have been used in this round. You explored ${finished.answered ?? 0} of ${finished.total} stepping stones.`
+              ? `Your trail hearts have been used in this round. You explored ${finished.answered ?? 0} of ${finished.total} stepping stones.`
               : `${skill.name} · ${story ? "Story expedition" : "Practice trail"} complete`}
           </p>
           <div className="finish-stats">
@@ -294,8 +461,16 @@ export default function Arithmetic({
           </div>
           {!story && (
             <div className="trail-keepsakes">
-              <span><Icon name="shield" size={16} /> Ending this round does not lower your level.</span>
-              {!!finished.bonus_points && <span className="bonus-earned"><Icon name="spark" size={16} /> +{finished.bonus_points} finish bonus included</span>}
+              <span>
+                <Icon name="shield" size={16} /> Ending this round does not
+                lower your level.
+              </span>
+              {!!finished.bonus_points && (
+                <span className="bonus-earned">
+                  <Icon name="spark" size={16} /> +{finished.bonus_points}{" "}
+                  finish bonus included
+                </span>
+              )}
             </div>
           )}
           <div className="tip-box">
@@ -306,9 +481,16 @@ export default function Arithmetic({
                 : "Try explaining one problem to someone you know. Teaching it is another way to explore it."}
             </p>
           </div>
-          {!story && <Button onClick={startFresh} disabled={busy || !!error}>
-            {busy ? "Preparing your stepping stones…" : stopped ? "Try a fresh trail" : "Climb again"} <Icon name="refresh" />
-          </Button>}
+          {!story && (
+            <Button onClick={startFresh} disabled={busy || !!error}>
+              {busy
+                ? "Preparing your stepping stones…"
+                : stopped
+                  ? "Try a fresh trail"
+                  : "Climb again"}{" "}
+              <Icon name="refresh" />
+            </Button>
+          )}
           <Button onClick={onDone} secondary={!story} disabled={busy}>
             See my field journal <Icon name="arrow" />
           </Button>
@@ -321,13 +503,21 @@ export default function Arithmetic({
           <div className="eyebrow">LET YOUR CURIOSITY CHOOSE</div>
           <h1>Where shall we wander?</h1>
           <p>Pick a world. There's a little math adventure waiting inside.</p>
-          <div className="theme-grid">
+          <div
+            className="theme-grid story-world-choices"
+            tabIndex={-1}
+            role="group"
+            aria-label="Choose your story world"
+          >
             {THEMES.map((t) => (
               <button
                 key={t.id}
                 className={`theme-card theme-${t.id} ${theme === t.id ? "selected" : ""}`}
                 aria-pressed={theme === t.id}
-                onClick={() => setTheme(t.id)}
+                onClick={() => {
+                  setTheme(t.id);
+                  setThemeChosen(true);
+                }}
                 disabled={busy || !!error}
               >
                 <div className="theme-art">
@@ -343,7 +533,11 @@ export default function Arithmetic({
             ))}
           </div>
           <div className="story-start">
-            <Button onClick={() => void makeStory()} disabled={busy || !!error}>
+            <Button
+              className="story-make-adventure"
+              onClick={() => void makeStory()}
+              disabled={busy || !!error}
+            >
               {busy ? "Finding your adventure…" : "Make my adventure"}
               <Icon name="spark" size={18} />
             </Button>
@@ -373,39 +567,112 @@ export default function Arithmetic({
                 ? "Imagine the world. Find the math inside."
                 : "Take a breath, try a strategy, and find your answer."}
             </p>
-            {resumed && <span className="trail-resumed"><Icon name="map" size={13} /> Welcome back. Your stepping stones are saved.</span>}
+            {resumed && (
+              <span className="trail-resumed">
+                <Icon name="map" size={13} /> Welcome back. Your stepping stones
+                are saved.
+              </span>
+            )}
           </div>
           {hasHearts && data && (
-            <section className="trail-dashboard" aria-label="Arithmetic trail status">
+            <section
+              className="trail-dashboard"
+              aria-label="Arithmetic trail status"
+            >
               <div className="trail-stat hearts-stat">
                 <span className="trail-stat-label">YOUR TRAIL HEARTS</span>
-                <div className="trail-hearts" aria-label={`${data.hearts_remaining} of ${data.hearts_total} hearts left`} role="img">
-                  {Array.from({ length: data.hearts_total! }, (_, n) => <Icon key={n} name="heart" size={23} className={n < (data.hearts_remaining ?? 0) ? "heart-full" : "heart-resting"} />)}
+                <div
+                  className="trail-hearts"
+                  aria-label={`${data.hearts_remaining} of ${data.hearts_total} hearts left`}
+                  role="img"
+                >
+                  {Array.from({ length: data.hearts_total! }, (_, n) => (
+                    <Icon
+                      key={n}
+                      name="heart"
+                      size={23}
+                      className={
+                        n < (data.hearts_remaining ?? 0)
+                          ? "heart-full"
+                          : "heart-resting"
+                      }
+                    />
+                  ))}
                 </div>
-                <small>{data.hearts_remaining === 0 ? "Time for a fresh trail" : "A new try after three misses"}</small>
+                <small>
+                  {data.hearts_remaining === 0
+                    ? "Time for a fresh trail"
+                    : `A new try after ${data.hearts_total === 1 ? "one miss" : "three misses"}`}
+                </small>
               </div>
               <div className="trail-stat">
                 <span className="trail-stat-label">POINTS COLLECTED</span>
-                <strong><Icon name="spark" size={18} /> {data.score || 0}</strong>
-                <small>{bonusEarned ? "Includes your +50 bonus" : "Each answer can add more"}</small>
+                <strong>
+                  <Icon name="spark" size={18} /> {data.score || 0}
+                </strong>
+                <small>
+                  {bonusEarned
+                    ? "Includes your +50 bonus"
+                    : "Each answer can add more"}
+                </small>
               </div>
               <div className="trail-stat">
                 <span className="trail-stat-label">LEVEL STREAK</span>
-                <strong>{data.run ?? skill.run}<span> / 3</span></strong>
-                <small>Independent answers in a row</small>
+                <strong>
+                  {data.run ?? skill.run}
+                  <span> / 3</span>
+                </strong>
+                <small>{data.practice_only ? "Practice round · streak stays saved" : "Independent answers in a row"}</small>
               </div>
-              <div className={`trail-stat bonus-stat ${bonusEarned ? "is-earned" : remaining === 0 ? "is-open-pace" : ""}`}>
+              <div
+                className={`trail-stat bonus-stat ${bonusEarned ? "is-earned" : remaining === 0 ? "is-open-pace" : ""}`}
+              >
                 <div className="bonus-stat-heading">
-                  <span className="trail-stat-label">{bonusEarned ? "BONUS COLLECTED" : "A LITTLE EXTRA"}</span>
-                  {!data.round_ended && remaining > 0 && <span className="bonus-clock" aria-label={`${Math.floor(remaining / 60)} minutes ${remaining % 60} seconds in the bonus window`}><Icon name="clock" size={13} /><span>{Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}</span></span>}
+                  <span className="trail-stat-label">
+                    {!data.bonus_deadline_at ? "CLOCK OFF" : bonusEarned ? "BONUS COLLECTED" : "A LITTLE EXTRA"}
+                  </span>
+                  {!data.round_ended && remaining > 0 && (
+                    <span
+                      className="bonus-clock"
+                      aria-label={`${Math.floor(remaining / 60)} minutes ${remaining % 60} seconds in the bonus window`}
+                    >
+                      <Icon name="clock" size={13} />
+                      <span>
+                        {Math.floor(remaining / 60)}:
+                        {String(remaining % 60).padStart(2, "0")}
+                      </span>
+                    </span>
+                  )}
                 </div>
                 <div className="bonus-message" role="status">
-                  {bonusEarned ? "+50 points. You made the whole trail!" : data.round_ended ? "Your earned points stay with you." : remaining > 0 ? `Finish all ${data.problems.length} for +50 points.` : "Keep going—your points are safe."}
+                  {!data.bonus_deadline_at
+                    ? "No deadline. Take your time."
+                    : bonusEarned
+                    ? "+50 points. You made the whole trail!"
+                    : data.round_ended
+                      ? "Your earned points stay with you."
+                      : remaining > 0
+                        ? `Finish all ${data.problems.length} for +50 points.`
+                        : "Keep going—your points are safe."}
                 </div>
-                {!data.round_ended && remaining > 0 ? <>
-                  <div className="bonus-track" aria-hidden="true"><span style={{ width: `${Math.min(100, remaining / (data.bonus_seconds || 120) * 100)}%` }} /></div>
-                  <small>The bonus clock never stops your play.</small>
-                </> : <small>{bonusEarned ? "Thoughtful practice counts, too." : "No points are taken away."}</small>}
+                {!data.round_ended && remaining > 0 ? (
+                  <>
+                    <div className="bonus-track" aria-hidden="true">
+                      <span
+                        style={{
+                          width: `${Math.min(100, (remaining / (data.bonus_seconds || 120)) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                    <small>The bonus clock never stops your play.</small>
+                  </>
+                ) : (
+                  <small>
+                    {bonusEarned
+                      ? "Thoughtful practice counts, too."
+                      : "No points are taken away."}
+                  </small>
+                )}
               </div>
             </section>
           )}
@@ -461,96 +728,105 @@ export default function Arithmetic({
                       </>
                     )}
                   </div>
-                  {!recoveredAssessment && <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void submit();
-                    }}
-                  >
-                    <label className="sr-only" htmlFor="answer">
-                      Your answer
-                    </label>
-                    <div
-                      className={`answer-input ${result ? (result.correct ? "correct" : "incorrect") : ""}`}
+                  {!recoveredAssessment && (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void submit();
+                      }}
                     >
-                      <input
-                        id="answer"
-                        ref={input}
-                        inputMode="numeric"
-                        autoComplete="off"
-                        value={entry}
-                        placeholder="Your answer"
-                        disabled={!!result || busy || !!error || data?.round_ended}
-                        onChange={(e) =>
-                          setEntry(
-                            e.target.value.replace(/[^0-9]/g, "").slice(0, 5),
-                          )
-                        }
-                      />
-                      {result && (
-                        <Icon
-                          name={result.correct ? "check" : "refresh"}
-                          size={24}
+                      <label className="sr-only" htmlFor="answer">
+                        Your answer
+                      </label>
+                      <div
+                        className={`answer-input ${result ? (result.correct ? "correct" : "incorrect") : ""}`}
+                      >
+                        <input
+                          id="answer"
+                          ref={input}
+                          inputMode="numeric"
+                          autoComplete="off"
+                          value={entry}
+                          placeholder="Your answer"
+                          disabled={
+                            !!result || busy || !!error || data?.round_ended
+                          }
+                          onChange={(e) =>
+                            setEntry(
+                              e.target.value.replace(/[^0-9]/g, "").slice(0, 5),
+                            )
+                          }
                         />
-                      )}
-                    </div>
-                    {!result && (
-                      <div className="number-pad" aria-label="Number keypad">
-                        {[
-                          "1",
-                          "2",
-                          "3",
-                          "4",
-                          "5",
-                          "6",
-                          "7",
-                          "8",
-                          "9",
-                          "delete",
-                          "0",
-                          "enter",
-                        ].map((k) => (
-                          <button
-                            type={k === "enter" ? "submit" : "button"}
-                            key={k}
-                            disabled={busy || !!error || data?.round_ended || (k === "enter" && !entry)}
-                            aria-label={
-                              k === "delete"
-                                ? "Delete last digit"
-                                : k === "enter"
-                                  ? "Check answer"
-                                  : k
-                            }
-                            className={
-                              k === "enter"
-                                ? "pad-enter"
-                                : k === "delete"
-                                  ? "pad-delete"
-                                  : ""
-                            }
-                            onClick={() => {
-                              if (k === "enter") return;
-                              setEntry((v) =>
-                                k === "delete"
-                                  ? v.slice(0, -1)
-                                  : v.length < 5
-                                    ? v + k
-                                    : v,
-                              );
-                            }}
-                          >
-                            {k === "delete" ? (
-                              "⌫"
-                            ) : k === "enter" ? (
-                              <Icon name="arrow" />
-                            ) : (
-                              k
-                            )}
-                          </button>
-                        ))}
+                        {result && (
+                          <Icon
+                            name={result.correct ? "check" : "refresh"}
+                            size={24}
+                          />
+                        )}
                       </div>
-                    )}
-                  </form>}
+                      {!result && (
+                        <div className="number-pad" aria-label="Number keypad">
+                          {[
+                            "1",
+                            "2",
+                            "3",
+                            "4",
+                            "5",
+                            "6",
+                            "7",
+                            "8",
+                            "9",
+                            "delete",
+                            "0",
+                            "enter",
+                          ].map((k) => (
+                            <button
+                              type={k === "enter" ? "submit" : "button"}
+                              key={k}
+                              disabled={
+                                busy ||
+                                !!error ||
+                                data?.round_ended ||
+                                (k === "enter" && !entry)
+                              }
+                              aria-label={
+                                k === "delete"
+                                  ? "Delete last digit"
+                                  : k === "enter"
+                                    ? "Check answer"
+                                    : k
+                              }
+                              className={
+                                k === "enter"
+                                  ? "pad-enter"
+                                  : k === "delete"
+                                    ? "pad-delete"
+                                    : ""
+                              }
+                              onClick={() => {
+                                if (k === "enter") return;
+                                setEntry((v) =>
+                                  k === "delete"
+                                    ? v.slice(0, -1)
+                                    : v.length < 5
+                                      ? v + k
+                                      : v,
+                                );
+                              }}
+                            >
+                              {k === "delete" ? (
+                                "⌫"
+                              ) : k === "enter" ? (
+                                <Icon name="arrow" />
+                              ) : (
+                                k
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </form>
+                  )}
                   {result && (
                     <div
                       className={`answer-feedback ${result.correct ? "success" : ""}`}
@@ -568,25 +844,50 @@ export default function Arithmetic({
                             : "That’s another connection made."
                           : `${p.prompt} = ${result.expected_answer}. ${skill.tip}`}
                       </p>
-                      {hasHearts && !result.correct && <p className="heart-feedback">
-                        <Icon name="heart" size={14} />
-                        {data?.ended_reason === "hearts" ? "This round is at its resting spot. Your level stays where it is." : `One heart used. ${data?.hearts_remaining} ${data?.hearts_remaining === 1 ? "heart is" : "hearts are"} ready for the next step.`}
-                      </p>}
-                      {recoveredAssessment && <p className="small muted">This answer was already checked. Your result is saved.</p>}
-                      <Button onClick={() => void next()} disabled={busy || !!error}>
-                        {busy ? "Saving your trail…" : data?.ended_reason === "hearts" ? "Rest at basecamp" : data?.round_ended || i === data!.problems.length - 1
-                          ? "Finish this trail"
-                          : "Next little challenge"}
+                      {hasHearts && !result.correct && (
+                        <p className="heart-feedback">
+                          <Icon name="heart" size={14} />
+                          {data?.ended_reason === "hearts"
+                            ? "This round is at its resting spot. Your level stays where it is."
+                            : `One heart used. ${data?.hearts_remaining} ${data?.hearts_remaining === 1 ? "heart is" : "hearts are"} ready for the next step.`}
+                        </p>
+                      )}
+                      {recoveredAssessment && (
+                        <p className="small muted">
+                          This answer was already checked. Your result is saved.
+                        </p>
+                      )}
+                      <Button
+                        className="arithmetic-next"
+                        onClick={() => void next()}
+                        disabled={busy || !!error}
+                      >
+                        {busy
+                          ? "Saving your trail…"
+                          : data?.ended_reason === "hearts"
+                            ? "Rest at basecamp"
+                            : data?.round_ended ||
+                                i === data!.problems.length - 1
+                              ? "Finish this trail"
+                              : "Next little challenge"}
                         <Icon name="arrow" />
                       </Button>
                     </div>
                   )}
-                  <div className="arithmetic-dots" role="img" aria-label={`${data?.answered ?? i} of ${data!.problems.length} stepping stones answered`}>
+                  <div
+                    className="arithmetic-dots"
+                    role="img"
+                    aria-label={`${data?.answered ?? i} of ${data!.problems.length} stepping stones answered`}
+                  >
                     {data!.problems.map((_, n) => (
                       <i
                         key={n}
                         className={
-                          n < (data?.answered ?? i) ? "complete" : n === i ? "current" : ""
+                          n < (data?.answered ?? i)
+                            ? "complete"
+                            : n === i
+                              ? "current"
+                              : ""
                         }
                       />
                     ))}
@@ -620,14 +921,29 @@ export default function Arithmetic({
                 <button
                   className="coach-hint"
                   onClick={() => void askHint()}
-                  disabled={busy || !!error || !!hint || !!result || !p || data?.round_ended}
+                  disabled={
+                    busy ||
+                    !!error ||
+                    !!hint ||
+                    !!result ||
+                    !p ||
+                    data?.round_ended
+                  }
                 >
                   <Icon name="spark" size={17} />
-                  {hint ? "Your nudge is ready" : hintUsed ? "Show my saved nudge" : "Give me a little nudge"}
+                  {hint
+                    ? "Your nudge is ready"
+                    : hintUsed
+                      ? "Show my saved nudge"
+                      : "Give me a little nudge"}
                   <Icon name="arrow" size={15} />
                 </button>
                 <span className="coach-source">
-                  {hasHearts ? "Hints keep every heart. Independent answers grow your level." : "Hints help you practice. Independent answers grow your level."}
+                  {data?.practice_only
+                    ? "This easier round is practice. Your level and streak stay saved."
+                    : hasHearts
+                    ? "Hints keep every heart. Independent answers grow your level."
+                    : "Hints help you practice. Independent answers grow your level."}
                 </span>
               </div>
               {visual && p && (
@@ -639,9 +955,15 @@ export default function Arithmetic({
               <div className="trail-note">
                 <Icon name="leaf" />
                 <div>
-                  <h4>{hasHearts ? "Every point is a little foothold." : "Your own pace is the right pace."}</h4>
+                  <h4>
+                    {hasHearts
+                      ? "Every point is a little foothold."
+                      : "Your own pace is the right pace."}
+                  </h4>
                   <p>
-                    {hasHearts ? "100 points for a correct independent answer; 60 with a nudge. The two-minute window adds a finish bonus. It never takes your points away." : "There’s no countdown. Your next step is ready whenever you are."}
+                    {hasHearts
+                      ? (data?.bonus_deadline_at ? "100 points for a correct independent answer; 60 with a nudge. The bonus window adds a finish bonus. It never takes your points away." : "100 points for a correct independent answer; 60 with a nudge. Your bonus clock is off.")
+                      : "There’s no countdown. Your next step is ready whenever you are."}
                   </p>
                 </div>
               </div>
@@ -673,26 +995,78 @@ export default function Arithmetic({
       )}
       {error && (
         <div className="error-banner" role="alert">
-          <span>{error} {data && "Try again to pick up at this same step."}</span>
+          <span>
+            {error} {data && "Try again to pick up at this same step."}
+          </span>
           <div className="trail-error-actions">
-            <button className="text-button" disabled={busy} onClick={() => {
-              if (retryRef.current) void perform(retryRef.current);
-            }}>{busy ? "Reconnecting…" : "Try again"}</button>
-            {!story && data && !finished && <button className="text-button" disabled={busy} onClick={() => void perform(async () => {
-              const r = await api(`/round/${encodeURIComponent(data.round_id)}`);
-              restoreRound(r, true);
-              if (r.round_ended && !r.result) await finishRound(r.round_id, false);
-            })}>Check saved progress</button>}
-            {!story && !data && <button className="text-button" disabled={busy} onClick={startFresh}>Start a fresh trail</button>}
+            <button
+              className="text-button"
+              disabled={busy}
+              onClick={() => {
+                if (retryRef.current) void perform(retryRef.current);
+              }}
+            >
+              {busy ? "Reconnecting…" : "Try again"}
+            </button>
+            {!story && data && !finished && (
+              <button
+                className="text-button"
+                disabled={busy}
+                onClick={() =>
+                  void perform(async () => {
+                    const r = await api(
+                      `/round/${encodeURIComponent(data.round_id)}`,
+                    );
+                    restoreRound(r, true);
+                    if (r.round_ended && !r.result)
+                      await finishRound(r.round_id, false);
+                  })
+                }
+              >
+                Check saved progress
+              </button>
+            )}
+            {!story && !data && (
+              <button
+                className="text-button"
+                disabled={busy}
+                onClick={startFresh}
+              >
+                Start a fresh trail
+              </button>
+            )}
           </div>
         </div>
       )}
+      {tutorial && (
+        <QuickTutorial
+          kind={story ? "story" : "arithmetic"}
+          onClose={closeTutorial}
+          reducedMotion={reducedMotion}
+        />
+      )}
+      <ActionBeacon
+        activityKey={`arithmetic:${story ? guidanceSessionId : data?.round_id || guidanceSessionId}`}
+        target={beaconTarget}
+        message={beaconMessage}
+        enabled={
+          introDone &&
+          !tutorial &&
+          !exit &&
+          !busy &&
+          !error &&
+          !finished &&
+          (choosingWorld || !!p)
+        }
+        resetKey={`${data?.round_id || "choose"}-${i}-${entry}-${themeChosen}-${theme}-${!!result}`}
+        reducedMotion={reducedMotion}
+      />
       {exit && (
         <Modal title="Head back to basecamp?" onClose={() => setExit(false)}>
           <p className="muted">
             {story
               ? "Answers you've already completed stay in your journal. You can choose a new story next time."
-              : "Your answers and remaining hearts are saved. Choose this trail again to pick up here. The bonus window keeps running while you are away; your earned points stay safe."}
+              : (data?.bonus_deadline_at ? "Your answers and remaining hearts are saved. Choose this trail again to pick up here. The bonus window keeps running while you are away; your earned points stay safe." : "Your answers and remaining hearts are saved. Choose this trail again to pick up here. Your bonus clock is off.")}
           </p>
           <Button onClick={onExit} disabled={busy}>
             Back to basecamp <Icon name="home" />

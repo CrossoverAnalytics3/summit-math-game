@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { QuickTutorial } from "./QuickTutorial";
+import { ActionBeacon } from "./ActionBeacon";
+import "./legacy-guidance.css";
 import {
   LEVELS,
   CHECKS,
@@ -140,10 +143,12 @@ export function NumberLine({ fraction }: { fraction: Fraction }) {
 }
 export default function TowerGame({
   sound,
+  reducedMotion = false,
   onDone,
   onExit,
 }: {
   sound: boolean;
+  reducedMotion?: boolean;
   onDone: () => void;
   onExit: () => void;
 }) {
@@ -151,7 +156,9 @@ export default function TowerGame({
     [scaffold, setScaffold] = useState(false),
     [split, setSplit] = useState(false),
     [exit, setExit] = useState(false),
-    [rules, setRules] = useState(false);
+    [rules, setRules] = useState(true),
+    [explored, setExplored] = useState<boolean[]>([false, false, false]),
+    [editedAfterCheck, setEditedAfterCheck] = useState(false);
   const level = LEVELS[Math.min(s.index, LEVELS.length - 1)],
     check = CHECKS[Math.min(s.index, CHECKS.length - 1)];
   const done = s.phase === "done",
@@ -173,8 +180,16 @@ export default function TowerGame({
       } catch {}
     } else saveLocal("summit.fraction.active", s);
   }, [s]);
+  useEffect(() => {
+    setExplored([false, false, false]);
+    setEditedAfterCheck(false);
+  }, [s.id, s.phase, s.index]);
   const spin = (row: number, direction: number) => {
     if (s.solved) return;
+    setEditedAfterCheck(true);
+    setExplored((visited) =>
+      visited.map((value, i) => (i === row ? true : value)),
+    );
     setS((p) => ({
       ...p,
       indices: p.indices.map((x, i) =>
@@ -195,6 +210,7 @@ export default function TowerGame({
   };
   const submitTower = () => {
     if (s.solved) return;
+    setEditedAfterCheck(false);
     const correct = isTowerCorrect(level, s.indices),
       attempts = s.attempts + 1;
     if (correct) {
@@ -270,6 +286,54 @@ export default function TowerGame({
     }));
   };
   const stats = summary(s.records);
+  const nextLayer = explored.findIndex((visited) => !visited);
+  const offerFeedback =
+    s.phase === "tower" &&
+    s.attempts > 0 &&
+    !s.solved &&
+    !editedAfterCheck &&
+    !scaffold;
+  const guidanceStep =
+    s.phase === "check"
+      ? s.answered
+        ? 2
+        : s.pick === null
+          ? 0
+          : 1
+      : s.solved
+        ? 2
+        : nextLayer === -1
+          ? 1
+          : 0;
+  const beaconTarget = done
+    ? null
+    : s.phase === "check"
+      ? s.answered
+        ? ".fraction-next"
+        : s.pick === null
+          ? ".fraction-check-choices"
+          : ".fraction-check-submit"
+      : s.solved
+        ? ".fraction-next"
+        : offerFeedback
+          ? ".fraction-hint"
+          : nextLayer === -1
+            ? ".fraction-light"
+            : `[data-fraction-layer="${nextLayer}"]`;
+  const beaconMessage =
+    s.phase === "check"
+      ? s.answered
+        ? "Your result is ready. Tap here for the next step."
+        : s.pick === null
+          ? "Tap the fraction you think matches. You choose the answer."
+          : "Ready? Tap here to check your choice."
+      : s.solved
+        ? "Your beacon is lit! Tap here to keep climbing."
+        : offerFeedback
+          ? "Pip has a clue. Tap here if you want help, or turn a layer to try again."
+          : nextLayer === -1
+            ? "Ready to test your three layers? Light the beacon."
+            : `Try this arrow to change the ${["fraction", "picture", "number line"][nextLayer]}. Keep turning until you think it matches.`;
   return (
     <div className="game-page fraction-game">
       <div className="game-toolbar">
@@ -296,11 +360,11 @@ export default function TowerGame({
           )}
         </div>
         <button
-          className="icon-button"
-          aria-label="How to play"
+          className="text-button legacy-help-button"
+          aria-label="Show me how to play"
           onClick={() => setRules(true)}
         >
-          <Icon name="help" />
+          <Icon name="help" size={17} /> Show me how
         </button>
       </div>
       {done ? (
@@ -355,6 +419,7 @@ export default function TowerGame({
             onClick={() => {
               setS(fresh());
               setScaffold(false);
+              setRules(true);
             }}
           >
             Explore this trail again
@@ -382,6 +447,39 @@ export default function TowerGame({
                 ? "Turn each layer to match the target. Then light your beacon."
                 : "Try a match without the tower. Take all the time you need."}
             </p>
+          </div>
+          <div className="legacy-action-guide" aria-label="Your next steps">
+            <div className="legacy-guide-heading">
+              <Icon name="compass" size={18} />
+              <strong>
+                {s.phase === "check"
+                  ? "Your own turn"
+                  : "Here is how to light this beacon"}
+              </strong>
+            </div>
+            <ol>
+              {(s.phase === "check"
+                ? [
+                    "Pick the fraction that matches the target.",
+                    "Tap ‘This is my match’ to check.",
+                    "Read what happened, then keep climbing.",
+                  ]
+                : [
+                    "Use each layer’s arrows. Make all three match the target above.",
+                    "Tap ‘Light the beacon’ to test your tower.",
+                    "Read Pip’s note. Turn again, or climb to the next beacon.",
+                  ]
+              ).map((text, index) => (
+                <li
+                  key={text}
+                  className={guidanceStep === index ? "current" : ""}
+                  aria-current={guidanceStep === index ? "step" : undefined}
+                >
+                  <span>{index + 1}</span>
+                  {text}
+                </li>
+              ))}
+            </ol>
           </div>
           <div
             className={`game-layout ${s.phase === "check" ? "check-layout" : ""}`}
@@ -490,6 +588,7 @@ export default function TowerGame({
                           <button
                             className="rotate-button"
                             aria-label={`Next ${["fraction", "picture", "number line"][row]}`}
+                            data-fraction-layer={row}
                             onClick={() => spin(row, 1)}
                             disabled={s.solved}
                           >
@@ -503,14 +602,14 @@ export default function TowerGame({
                   </div>
                   <div className="stage-action">
                     {s.solved ? (
-                      <Button onClick={nextTower}>
+                      <Button className="fraction-next" onClick={nextTower}>
                         {s.index === 2
                           ? "Try it on your own"
                           : "On to the next beacon"}
                         <Icon name="arrow" />
                       </Button>
                     ) : (
-                      <Button onClick={submitTower}>
+                      <Button className="fraction-light" onClick={submitTower}>
                         Light the beacon <Icon name="spark" size={17} />
                       </Button>
                     )}
@@ -532,7 +631,8 @@ export default function TowerGame({
                     <FractionText {...check.target} />
                   </div>
                   <div
-                    className="answer-options"
+                    className="answer-options fraction-check-choices"
+                    tabIndex={-1}
                     role="group"
                     aria-label="Equivalent fraction choices"
                   >
@@ -552,14 +652,18 @@ export default function TowerGame({
                     ))}
                   </div>
                   {s.answered ? (
-                    <Button onClick={nextCheck}>
+                    <Button className="fraction-next" onClick={nextCheck}>
                       {s.index === 1
                         ? "See my discoveries"
                         : "One more little discovery"}
                       <Icon name="arrow" />
                     </Button>
                   ) : (
-                    <Button onClick={submitCheck} disabled={s.pick === null}>
+                    <Button
+                      className="fraction-check-submit"
+                      onClick={submitCheck}
+                      disabled={s.pick === null}
+                    >
                       This is my match <Icon name="check" />
                     </Button>
                   )}
@@ -602,7 +706,10 @@ export default function TowerGame({
                   </p>
                 </div>
                 {s.phase === "tower" && !s.solved && (
-                  <button className="coach-hint" onClick={askHint}>
+                  <button
+                    className="coach-hint fraction-hint"
+                    onClick={askHint}
+                  >
                     <Icon name="spark" size={17} />
                     Give me a little nudge
                     <Icon name="arrow" size={15} />
@@ -729,33 +836,20 @@ export default function TowerGame({
         </Modal>
       )}
       {rules && (
-        <Modal
-          title="Three layers. One amount."
+        <QuickTutorial
+          kind="fraction"
           onClose={() => setRules(false)}
-        >
-          <div className="how-step">
-            <span>1</span>
-            <p>Look at the target fraction above the tower.</p>
-          </div>
-          <div className="how-step">
-            <span>2</span>
-            <p>
-              Use the arrows to turn each layer. Match the fraction, shaded
-              picture, and number-line point.
-            </p>
-          </div>
-          <div className="how-step">
-            <span>3</span>
-            <p>
-              Light the beacon when all three show the same amount. Pip can help
-              you figure it out.
-            </p>
-          </div>
-          <Button onClick={() => setRules(false)}>
-            I've got this <Icon name="arrow" />
-          </Button>
-        </Modal>
+          reducedMotion={reducedMotion}
+        />
       )}
+      <ActionBeacon
+        activityKey={`fraction:${s.id}`}
+        target={beaconTarget}
+        message={beaconMessage}
+        enabled={!rules && !exit && !done}
+        resetKey={`${s.id}-${s.phase}-${s.index}-${s.indices.join("-")}-${s.pick}-${s.solved}-${s.answered}-${s.attempts}`}
+        reducedMotion={reducedMotion}
+      />
     </div>
   );
 }

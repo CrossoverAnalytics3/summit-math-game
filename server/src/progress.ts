@@ -77,10 +77,13 @@ export function weeklyFacts(learnerId: string) {
   }
   const unlocked = rows.filter((r) => r.name === "level_unlocked").map((r) => JSON.parse(r.payload));
   const rounds = rows.filter((r) => r.name === "round_finished").length;
+  // Fix Pip's homework: three separate facts, never folded into a score.
+  const hw = rows.filter((r) => r.name === "homework_result").map((r) => JSON.parse(r.payload));
+  const homework = { pages: hw.length, spotted: hw.filter((h) => h.spotted).length, explained: hw.filter((h) => h.explained).length, fixed: hw.filter((h) => h.fixed).length };
   const prog = progress(learnerId);
   const weakest = Object.entries(bySkill).sort((x, y) => (x[1].correct / x[1].attempts) - (y[1].correct / y[1].attempts))[0]?.[0] ?? null;
   return {
-    rounds, unlocked, by_skill: Object.entries(bySkill).map(([id, v]) => ({ skill_id: id, name: SKILLS.find((s) => s.id === id)?.name, ...v })),
+    rounds, homework, unlocked, by_skill: Object.entries(bySkill).map(([id, v]) => ({ skill_id: id, name: SKILLS.find((s) => s.id === id)?.name, ...v })),
     weakest_skill: weakest ? SKILLS.find((s) => s.id === weakest)?.name ?? null : null,
     levels: prog.map((p) => ({ skill_id: p.skill_id, name: SKILLS.find((s) => s.id === p.skill_id)?.name, level: p.level })),
   };

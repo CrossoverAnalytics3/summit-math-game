@@ -2,11 +2,19 @@
 
 Use Node 24 or later. The server uses Node's bundled SQLite driver, so it does not need a separately compiled database addon.
 
-The default port is **3001**, bound to **127.0.0.1**. The optional `SUMMIT_HOST` setting can change the binding, but the unauthenticated demo is not ready for public exposure. Development uses the Vite browser on **5174**, which forwards `/api` to this server. When `web/dist/index.html` exists at startup, the server also serves the complete built game on port 3001. An explicit `PORT` setting takes precedence.
+The default port is **3013**, bound to **127.0.0.1**. The optional `SUMMIT_HOST` setting can change the binding, but the unauthenticated demo is not ready for public exposure. Development uses the Vite browser on **5177**, which forwards `/api` to this server. When `web/dist/index.html` exists at startup, the server also serves the complete built game on port 3013. An explicit `PORT` setting takes precedence.
 
 The project-root `.env` is loaded before configuration is read. `SUMMIT_ENV_FILE` can point to an existing private environment file elsewhere. Environment variables already set in the process take precedence. Never bundle that private file into a shared copy. Tests skip environment-file loading; the offline evaluation uses only explicit test adapters.
 
-## Assessment contract
+## Teach the Climb
+
+The main expedition uses the shared deterministic engine in `shared/expedition.ts`. Its journal is stored in SQLite with a browser cache for offline play. The four journal routes and the coaching endpoint do not create authenticated learner accounts. See [teaching persistence](../docs/TEACHING-PERSISTENCE.md) for the storage API and revision-conflict contract. See the current [architecture](../docs/ARCHITECTURE.md) for storage, correction, and privacy boundaries.
+
+`POST /api/teaching/coach` accepts a supported route and stage, a structured plan, a fair-share prediction, recorded support labels, a local evidence reference, and a variation index. It rejects unknown fields and recomputes the actual situation and result. Client-supplied outcomes are not accepted.
+
+Without consent or a provider, the response contains an authored question and Pip line. With both enabled, the model may select valid IDs from context-specific authored banks. Invalid choices, errors, or a deadline fall back to authored selection. The response includes content source and the local evidence reference. The model never receives journal notes, correction text, or the evidence reference itself. This route has a bounded request rate and timeout; these controls are not a substitute for authentication.
+
+## Original arithmetic assessment contract
 
 - `POST /api/round` with `{ "skill_id": "add20" }` returns a `round_id`, `level`, and seven distinct problems at that level with opaque `id` values. It does not return solutions or generator seeds. New trails start with `hearts_total: 3`, `hearts_remaining: 3`, `bonus_seconds: 120`, and a server-generated `bonus_deadline_at` in epoch milliseconds. `server_now` uses the same units.
 - `POST /api/answer` with `{ "problem_id": "…", "answer": 7 }` checks the stored problem. It returns `correct` (a boolean), `expected_answer`, `used_hint`, `level`, `run`, and `unlocked`, plus current `hearts_remaining`, `answered`, `total`, `score`, `bonus_points`, `bonus_deadline_at`, `server_now`, `round_ended`, and `ended_reason`. Each first incorrect assessment consumes one heart. Only the first submission is assessed; repeated submissions return that exact original snapshot without consuming another heart or awarding progress again.
@@ -32,11 +40,11 @@ The browser can persist a round ID, retrieve its snapshot, and retry Finish when
 
 ## Scope and verification
 
-This is a **single-learner local demo**. It has no accounts, guardian identity verification, authorization boundary, or production rate limiting. Administrative demo endpoints are unauthenticated. Hosting the built browser on the same port does not make the demo a production service.
+This is a **single-learner local demo**. It has no accounts, guardian identity verification, authorization boundary, or a complete production traffic-control policy. The teaching-coach endpoint has its own request limit. Administrative demo endpoints are unauthenticated. Hosting the built browser on the same port does not make the demo a production service.
 
-The provider has an implemented eight-second timeout (the elapsed timeout/abort is not directly tested) and falls back to authored content when it fails or automated checks reject its output. The checks constrain numbers and format; they do not prove semantic accuracy, child appropriateness, or learning impact. Learner names are not included in model prompts. Numeric parent counts come from stored game events.
+The inherited arithmetic provider has an implemented eight-second timeout (its elapsed timeout/abort is not directly tested) and falls back to authored content when it fails or automated checks reject its output. The checks constrain numbers and format; they do not prove semantic accuracy, child appropriateness, or learning impact. Learner names are not included in model prompts. Numeric parent counts come from stored game events.
 
-Run `npm test -w server` for the API, privacy, progression, and arithmetic tests. Run `npm run eval -w server` for a repeatable offline evaluation of generated arithmetic and content fallback behavior. Neither command makes live model calls.
+Run `npm test -w server` for the teaching coach, API, privacy, progression, and arithmetic tests. The new teaching-coach adapter has separate timeout and fallback tests. Run `npm run eval -w server` for a repeatable offline evaluation of generated arithmetic and content fallback behavior. Neither command makes live model calls.
 
 ## What measurement exists
 

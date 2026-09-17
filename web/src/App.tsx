@@ -1,674 +1,1066 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import LegacyApp from "./LegacyApp";
+import { Icon, Button, Modal, Owl } from "./ui";
+import { Party, RouteArt } from "./TeachScene";
 import {
-  api,
-  Icon,
-  Button,
-  Modal,
-  Owl,
-  readLocal,
-  saveLocal,
-  type IconName,
-} from "./ui";
-import type { Home, Skill, Preferences } from "./types";
-import TowerGame from "./TowerGame";
-import Arithmetic from "./Arithmetic";
-import Reports from "./Reports";
+  contextFor,
+  createRun,
+  createEvidenceSummary,
+  createInterpretation,
+  reconcileInterpretations,
+  correctInterpretation,
+  invalidateDependentQuestions,
+  selectCurrentRun,
+  type Route,
+  type TeachingPlan,
+  type RunRecord,
+  type Interpretation,
+} from "../../shared/expedition";
+import "./teach.css";
+import { TeachHome } from "./TeachHome";
+import { TeachFlow } from "./TeachFlow";
+import { TeachingJournal } from "./TeachingJournal";
+import { useTeachingJournal } from "./useTeachingJournal";
+import type { Journal, Coach } from "../../shared/journal";
+import type { TeachingPage } from "./teachingTypes";
+import { QuickTutorial, type TutorialKind } from "./QuickTutorial";
+import { ActionBeacon } from "./ActionBeacon";
 
-type Screen =
-  | "explore"
-  | "journey"
-  | "grownups"
-  | "tower"
-  | "arithmetic"
-  | "story";
-export default function App() {
-  const [home, setHome] = useState<Home | null>(null),
-    [error, setError] = useState(""),
-    [screen, setScreen] = useState<Screen>("explore"),
-    [skill, setSkill] = useState<Skill | null>(null),
-    [settings, setSettings] = useState(false),
-    [help, setHelp] = useState(false);
-  const [prefs, setPrefs] = useState<Preferences>(() =>
-    readLocal("summit.preferences", {
-      sound: false,
-      motion: true,
-      contrast: false,
-    }),
+type Page = TeachingPage;
+function uid() {
+  return crypto.randomUUID();
+}
+function download(book: Journal) {
+  const blob = new Blob(
+    [
+      JSON.stringify(
+        {
+          product: "Summit Teach the Climb",
+          exportedAt: new Date().toISOString(),
+          ...book,
+          statement:
+            "Local expedition observations, not validated mastery or a learning-style profile.",
+        },
+        null,
+        2,
+      ),
+    ],
+    { type: "application/json" },
   );
-  const reload = useCallback(async () => {
-    try {
-      setHome(await api("/home"));
-      setError("");
-    } catch (e) {
-      setError((e as Error).message);
-    }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "summit-teaching-journal.json";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export default function App() {
+  const {
+    book,
+    setBook,
+    syncStatus,
+    retrySync,
+    loadServerCopy,
+    recoveryAvailable,
+    downloadRecovery,
+    localStorageFailed,
+  } = useTeachingJournal();
+  const [page, setPage] = useState<Page>("home");
+  const [tutorial, setTutorial] = useState<TutorialKind | null>(null);
+  const introducedRoutes = useRef(new Set<Route>());
+  const [modal, setModal] = useState<"grownups" | "settings" | "new" | null>(
+      null,
+    ),
+    [toast, setToast] = useState("");
+  const [frame, setFrame] = useState(
+      () =>
+        book.runs.find((r) => r.id === book.currentRunId)?.result.steps
+          .length ?? 0,
+    ),
+    [playing, setPlaying] = useState(false),
+    [picture, setPicture] = useState(() => book.supports.includes("picture"));
+  const [coachBusy, setCoachBusy] = useState(false),
+    [health, setHealth] = useState<any>(null),
+    [aiBusy, setAiBusy] = useState(false);
+  const [correctionRunId, setCorrectionRunId] = useState<string | null>(null);
+  const [correction, setCorrection] = useState<Interpretation | null>(null),
+    [correctionKind, setCorrectionKind] = useState<"context" | "system">(
+      "context",
+    ),
+    [correctionNote, setCorrectionNote] = useState("");
+  const [reduced, setReduced] = useState(
+      () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    ),
+    [contrast, setContrast] = useState(false);
+  const coachSeq = useRef(0),
+    coachAbort = useRef<AbortController | null>(null);
+  const route = book.route || "ridge",
+    context = contextFor(route, book.stage);
+  const summary = createEvidenceSummary(book.runs);
+  const run = selectCurrentRun(
+    book.runs,
+    book.currentRunId,
+    book.route,
+    book.stage,
+  );
+  const visibleResult = !!run && !playing && frame >= run.result.steps.length;
+  const ready = !!book.prediction;
+  const guide = playing
+    ? {
+        step: 3,
+        title: "Watch Pip follow your teaching",
+        text: "Look at each bowl as Pip shares. You can pause whenever you like.",
+        target: null,
+        action: "Watching together",
+      }
+    : run && !visibleResult
+      ? {
+          step: 3,
+          title: "Ready to watch the rest?",
+          text: "Pip is paused. Tap Resume to keep watching your idea.",
+          target: ".teach-resume",
+          action: "Find Resume",
+        }
+      : visibleResult && run?.systemIssue
+        ? {
+            step: 4,
+            title: "Let’s try your intended teaching again",
+            text: "You reported that the interface misunderstood. Your earlier replay is saved; choose the instruction you meant to use.",
+            target: ".teach-revise",
+            action: "Choose my intended teaching",
+          }
+        : visibleResult && run?.result.complete
+          ? {
+              step: 4,
+              title: "Compare the bowls. Then keep climbing!",
+              text: "Everyone has the same amount and the basket is empty. Your teaching worked here.",
+              target: ".teach-continue",
+              action: "Find the next step",
+            }
+          : visibleResult
+            ? {
+                step: 4,
+                title: "What could you change?",
+                text: "Pip followed your teaching. Look at the bowls, then try another idea. Experiments are welcome.",
+                target: ".teach-revise",
+                action: "Find Try another idea",
+              }
+            : !book.planConfirmed
+              ? {
+                  step: 1,
+                  title:
+                    book.stage === "first"
+                      ? "First, choose your teaching"
+                      : "Keep your teaching, or change it",
+                  text: "Pick a card below. Set your fraction or amount, then tap Use this teaching.",
+                  target: ".teach-confirm",
+                  action: "Choose my teaching",
+                }
+              : !ready
+                ? {
+                    step: 2,
+                    title: "What do you think a fair share would be?",
+                    text: "Pick how many berries each friend should get. You can choose I’m not sure yet.",
+                    target: "#prediction",
+                    action: "Find my prediction",
+                  }
+                : {
+                    step: 3,
+                    title: "Your idea is ready. Let Pip try it!",
+                    text: "Tap Let Pip try this and watch what your instruction does.",
+                    target: ".teach-run",
+                    action: "Find Let Pip try this",
+                  };
+  function pointTo(selector: string | null) {
+    if (!selector) return;
+    const element = document.querySelector<HTMLElement>(selector);
+    element?.scrollIntoView({
+      behavior: reduced ? "instant" : "smooth",
+      block: "center",
+    });
+    element?.focus({ preventScroll: true });
+  }
+  function showTutorial() {
+    cancelCoach();
+    setTutorial(route === "ridge" ? "teaching-ridge" : "teaching-meadow");
+  }
+  function closeTutorial() {
+    introducedRoutes.current.add(route);
+    setTutorial(null);
+    requestAnimationFrame(() =>
+      pointTo(run ? guide.target : "#teaching-controls"),
+    );
+  }
+  function confirmTeaching() {
+    setBook((b) => ({ ...b, planConfirmed: true }));
+    requestAnimationFrame(() => pointTo("#prediction"));
+  }
+  function reviseTeaching() {
+    teach(book.plan);
+    requestAnimationFrame(() => pointTo("#teaching-controls"));
+  }
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+  }, [page, book.stage]);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(""), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
+  useEffect(() => {
+    fetch("/api/health")
+      .then((r) => r.json())
+      .then(setHealth)
+      .catch(() => setHealth(null));
   }, []);
   useEffect(() => {
-    void reload();
-  }, [reload]);
-  useEffect(() => {
-    saveLocal("summit.preferences", prefs);
-    document.documentElement.classList.toggle("still", !prefs.motion);
-    document.documentElement.classList.toggle("high-contrast", prefs.contrast);
-  }, [prefs]);
-  const go = (next: Screen, s?: Skill) => {
-    if (s) setSkill(s);
-    setScreen(next);
-    window.scrollTo({ top: 0, behavior: "instant" });
-    void reload();
-  };
-  const playing = ["tower", "arithmetic", "story"].includes(screen);
+    if (!playing || !run) return;
+    if (reduced) {
+      setFrame(run.result.steps.length);
+      setPlaying(false);
+      return;
+    }
+    const t = setInterval(
+      () =>
+        setFrame((f) => {
+          if (f >= run.result.steps.length) {
+            setPlaying(false);
+            return f;
+          }
+          return f + 1;
+        }),
+      480,
+    );
+    return () => clearInterval(t);
+  }, [playing, run, reduced]);
+  useEffect(
+    () => () => {
+      coachAbort.current?.abort();
+    },
+    [],
+  );
+  function cancelCoach() {
+    coachSeq.current++;
+    coachAbort.current?.abort();
+    coachAbort.current = null;
+    setCoachBusy(false);
+  }
+  function go(p: Page) {
+    cancelCoach();
+    setPlaying(false);
+    if (run) setFrame(run.result.steps.length);
+    if (
+      p === "play" &&
+      book.route &&
+      !introducedRoutes.current.has(book.route)
+    ) {
+      setTutorial(
+        book.route === "ridge" ? "teaching-ridge" : "teaching-meadow",
+      );
+    }
+    setPage(p);
+  }
+  function chooseRoute(r: Route) {
+    cancelCoach();
+    setBook((b) => ({
+      ...b,
+      route: r,
+      expeditionId: uid(),
+      lastPlayedAt: new Date().toISOString(),
+      stage: "first",
+      plan:
+        r === "ridge" ? { kind: "fraction", n: 1, d: 2 } : { kind: "rounds" },
+      prediction: "",
+      planConfirmed: false,
+      supports: [],
+      currentRunId: null,
+      completed: false,
+    }));
+    setFrame(0);
+    setPicture(false);
+    setPlaying(false);
+    setPage("play");
+    setTutorial(r === "ridge" ? "teaching-ridge" : "teaching-meadow");
+  }
+  function newExpedition() {
+    cancelCoach();
+    setBook((b) => ({
+      ...b,
+      route: null,
+      expeditionId: uid(),
+      stage: "first",
+      plan: { kind: "rounds" },
+      prediction: "",
+      planConfirmed: false,
+      supports: [],
+      currentRunId: null,
+      completed: false,
+    }));
+    setPicture(false);
+    setFrame(0);
+    setPlaying(false);
+    setModal(null);
+    setPage("routes");
+  }
+  function teach(plan: TeachingPlan) {
+    cancelCoach();
+    setBook((b) => ({
+      ...b,
+      plan,
+      planConfirmed: false,
+      prediction: "",
+      currentRunId: null,
+    }));
+    setFrame(0);
+    setPlaying(false);
+  }
+  function choosePrediction(value: string) {
+    cancelCoach();
+    setBook((b) => ({ ...b, prediction: value, currentRunId: null }));
+    setFrame(0);
+    setPlaying(false);
+  }
+  function beginRun() {
+    if (book.runs.length >= 200) {
+      setToast(
+        "This demo journal has 200 attempts. Export it to keep exploring with a grown-up.",
+      );
+      return;
+    }
+    if (!ready || !book.planConfirmed || playing || tutorial) return;
+    cancelCoach();
+    const r = createRun({
+      id: uid(),
+      route,
+      stage: book.stage,
+      plan: book.plan,
+      prediction: book.prediction,
+      supports: book.supports,
+    });
+    const previous = [...book.runs]
+      .reverse()
+      .find((item) => item.route === route && !item.systemIssue);
+    const receipt = createInterpretation({
+      id: uid(),
+      runs: [...book.runs, r],
+      runIds: previous ? [previous.id, r.id] : [r.id],
+      text: r.result.complete
+        ? "This teaching may be worth trying with a different basket or group."
+        : "A closer look at this instruction may help explain the result.",
+      nextQuestion: r.result.complete
+        ? "What would you predict if the basket or the group changed?"
+        : "Which part of your instruction would you try changing, and why?",
+    });
+    setBook((b) => ({
+      ...b,
+      currentRunId: r.id,
+      runs: [...b.runs, r],
+      lastPlayedAt: r.date,
+      receipts: [...b.receipts, receipt],
+    }));
+    setFrame(0);
+    setPlaying(r.result.steps.length > 0);
+    document.querySelector(".picnic-board")?.scrollIntoView({
+      behavior: reduced ? "instant" : "smooth",
+      block: "start",
+    });
+  }
+  function continueClimb() {
+    if (!run?.result.complete || run.systemIssue) return;
+    cancelCoach();
+    if (book.stage === "transfer") {
+      setBook((b) => ({ ...b, completed: true }));
+      go("summit");
+      return;
+    }
+    setBook((b) => ({
+      ...b,
+      stage: b.stage === "first" ? "changed" : "transfer",
+      prediction: "",
+      planConfirmed: false,
+      supports: [],
+      currentRunId: null,
+    }));
+    setFrame(0);
+    setPicture(false);
+    setPlaying(false);
+  }
+  function showPicture() {
+    setPicture(true);
+    setBook((b) => ({
+      ...b,
+      supports: Array.from(new Set([...b.supports, "picture"])),
+    }));
+  }
+  async function askCoach(r: RunRecord) {
+    if (
+      r.systemIssue ||
+      book.receipts.some(
+        (i) =>
+          i.runIds.includes(r.id) &&
+          ["corrected", "withdrawn"].includes(i.status),
+      )
+    ) {
+      setToast(
+        "Your correction comes first. Try a new teaching before asking for a new follow-up.",
+      );
+      return;
+    }
+    cancelCoach();
+    const seq = ++coachSeq.current,
+      controller = new AbortController();
+    coachAbort.current = controller;
+    setCoachBusy(true);
+    const saveCoach = (c: Coach) => {
+      if (seq !== coachSeq.current) return;
+      setBook((b) => {
+        if (
+          b.currentRunId !== r.id ||
+          b.route !== r.route ||
+          b.stage !== r.stage ||
+          b.runs.find((item) => item.id === r.id)?.systemIssue ||
+          b.receipts.some(
+            (i) =>
+              i.runIds.includes(r.id) &&
+              ["corrected", "withdrawn"].includes(i.status),
+          )
+        )
+          return b;
+        return {
+          ...b,
+          supports: Array.from(new Set([...b.supports, "coach"])),
+          coaches: { ...b.coaches, [r.id]: c },
+        };
+      });
+    };
+    try {
+      const response = await fetch("/api/teaching/coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          route: r.route,
+          stage: r.stage,
+          plan: r.plan,
+          prediction: r.prediction,
+          supports: r.supports,
+          evidenceId: r.id,
+          variation: seq % 3,
+        }),
+        signal: AbortSignal.any([
+          controller.signal,
+          AbortSignal.timeout(10000),
+        ]),
+      });
+      if (!response.ok) throw Error();
+      const c: Coach = await response.json();
+      if (
+        !["ai", "authored"].includes(c.source) ||
+        typeof c.title !== "string" ||
+        typeof c.question !== "string" ||
+        typeof c.narrative !== "string" ||
+        !Array.isArray(c.evidenceIds) ||
+        !c.evidenceIds.includes(r.id)
+      )
+        throw Error();
+      saveCoach(c);
+    } catch {
+      saveCoach({
+        source: "authored",
+        title: "A moment to wonder",
+        question: r.result.complete
+          ? "What could you change while keeping a fair share?"
+          : "Is this what you meant Pip to do? Which instruction could you change?",
+        narrative:
+          "Your expedition is still here. Take a moment to try another idea.",
+        evidenceIds: [r.id],
+        generation: { question: "authored", narrative: "authored" },
+      });
+    } finally {
+      if (seq === coachSeq.current) {
+        setCoachBusy(false);
+        coachAbort.current = null;
+      }
+    }
+  }
+  function applyCorrection() {
+    if (!correction || !correctionNote.trim()) return;
+    cancelCoach();
+    setBook((b) => {
+      const currentReceipt = b.receipts.find((i) => i.id === correction.id);
+      if (!currentReceipt) return b;
+      const changed = correctInterpretation(
+        currentReceipt,
+        {
+          kind: correctionKind,
+          note: correctionNote.trim().slice(0, 500),
+          ...(correctionRunId ? { runId: correctionRunId } : {}),
+        },
+        b.runs,
+      );
+      const receipts = reconcileInterpretations(
+        invalidateDependentQuestions(
+          b.receipts.map((i) =>
+            i.id === correction.id ? changed.interpretation : i,
+          ),
+          correction.id,
+        ),
+        changed.runs,
+      );
+      const affectedRunIds = new Set(
+        receipts
+          .filter((i) => ["corrected", "withdrawn"].includes(i.status))
+          .flatMap((i) => i.runIds),
+      );
+      return {
+        ...b,
+        runs: changed.runs,
+        receipts,
+        completed:
+          b.completed &&
+          !changed.runs.some((r) => r.id === b.currentRunId && r.systemIssue),
+        coaches: Object.fromEntries(
+          Object.entries(b.coaches).filter(
+            ([id, c]) =>
+              !affectedRunIds.has(id) &&
+              !c.evidenceIds.some((key) => affectedRunIds.has(key)),
+          ),
+        ),
+      };
+    });
+    setCorrection(null);
+    setCorrectionNote("");
+    setToast("Context saved. The dependent follow-up was withdrawn.");
+  }
+  async function toggleAI() {
+    setAiBusy(true);
+    try {
+      const response = await fetch("/api/settings/ai-consent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !health?.guardian_consent_ai }),
+      });
+      if (!response.ok) throw Error();
+      const h = await response.json();
+      setHealth({ ...health, ...h });
+      setToast(
+        h.guardian_consent_ai
+          ? "Optional AI selection is allowed. A configured server key is still required."
+          : "Authored questions are selected.",
+      );
+    } catch {
+      setToast(
+        "The setting could not be saved. Authored play is still available.",
+      );
+    } finally {
+      setAiBusy(false);
+    }
+  }
+  const shownShares = run
+    ? run.result.shares.map((_, i) =>
+        run.result.steps
+          .slice(0, frame)
+          .filter((s) => s.personIndex === i)
+          .reduce((n, s) => n + s.amount, 0),
+      )
+    : Array(context.party).fill(0);
+  const shownRemaining = run
+    ? frame
+      ? (run.result.steps[Math.min(frame, run.result.steps.length) - 1]
+          ?.after ?? context.total)
+      : context.total
+    : context.total;
+  const activeCoach = run ? book.coaches[run.id] : null;
+  if (syncStatus === "loading")
+    return (
+      <div className="teach-app">
+        <main className="page-intro" role="status">
+          <Owl />
+          <p>Opening your saved expedition…</p>
+        </main>
+      </div>
+    );
+  if (page === "legacy")
+    return (
+      <>
+        <div className="legacy-return">
+          <button onClick={() => go("home")}>
+            <Icon name="back" size={16} /> Back to Teach the Climb
+          </button>
+          <span>Original practice trails · separate practice records</span>
+        </div>
+        <LegacyApp onOpenTeachingJournal={() => go("journal")} />
+      </>
+    );
   return (
-    <div className="app-shell">
-      <a href="#main-content" className="skip-link">
-        Skip to content
+    <div
+      className={`teach-app ${reduced ? "reduce-motion" : ""} ${contrast ? "high-contrast" : ""}`}
+    >
+      <a className="skip-link" href="#teach-main">
+        Skip to adventure
       </a>
-      <header className="site-header">
+      <header className="teach-header">
         <button
           className="brand"
-          onClick={() => go("explore")}
+          onClick={() => go("home")}
           aria-label="Summit home"
         >
           <span className="brand-icon">
-            <Icon name="mountain" size={29} />
+            <Icon name="mountain" size={28} />
           </span>
-          <span>
-            summit<span className="brand-period">.</span>
-          </span>
+          summit<span className="brand-period">.</span>
         </button>
-        {!playing && (
-          <nav aria-label="Main navigation">
-            <button
-              className={screen === "explore" ? "active" : ""}
-              onClick={() => go("explore")}
-            >
-              <Icon name="compass" size={17} />
-              Explore
-            </button>
-            <button
-              className={screen === "journey" ? "active" : ""}
-              onClick={() => go("journey")}
-            >
-              <Icon name="map" size={17} />
-              My journey
-            </button>
-          </nav>
-        )}
-        {playing && (
-          <span className="header-trail">
-            <Icon name="mountain" size={16} />
-            {screen === "tower"
-              ? "Fraction peaks"
-              : screen === "story"
-                ? "Story expedition"
-                : skill?.name}
-          </span>
-        )}
-        <div className="header-actions">
-          <button className="grownups-link" onClick={() => go("grownups")}>
-            For grown-ups <Icon name="arrow" size={14} />
+        <span className="teach-edition">TEACH THE CLIMB</span>
+        <nav aria-label="Main navigation">
+          <button
+            className={
+              page === "home" || page === "routes" || page === "play"
+                ? "active"
+                : ""
+            }
+            onClick={() => go("home")}
+          >
+            <Icon name="compass" size={17} />
+            <span>Adventure</span>
           </button>
           <button
-            className="icon-button sound-toggle"
-            aria-label={prefs.sound ? "Turn sound off" : "Turn sound on"}
-            onClick={() => setPrefs({ ...prefs, sound: !prefs.sound })}
+            className={page === "journal" ? "active" : ""}
+            onClick={() => go("journal")}
           >
-            <Icon name={prefs.sound ? "sound" : "muted"} size={18} />
+            <Icon name="book" size={17} />
+            <span>Teaching journal</span>
+            {book.runs.length > 0 && <i>{book.runs.length}</i>}
           </button>
-          <button
-            className="avatar"
-            onClick={() => setSettings(true)}
-            aria-label="Explorer settings"
-          >
-            S<span />
-          </button>
-        </div>
+        </nav>
+        <button className="teach-grownups" onClick={() => setModal("grownups")}>
+          For grown-ups <Icon name="arrow" size={14} />
+        </button>
+        <button
+          className="icon-button"
+          aria-label="Comfort settings"
+          onClick={() => setModal("settings")}
+        >
+          <Icon name="settings" size={19} />
+        </button>
       </header>
-      <main id="main-content">
-        {!home ? (
-          <div className="loading-panel">
-            <Icon name="mountain" size={54} />
-            <h1>
-              {error
-                ? "The trail is taking a moment."
-                : "Preparing your next adventure…"}
-            </h1>
-            <p>{error || "A little curiosity goes a long way."}</p>
-            {error && <Button onClick={() => void reload()}>Try again</Button>}
+      {recoveryAvailable && (
+        <div className="teach-warning" role="status">
+          An older device journal could not be read. Its original contents have
+          been kept for recovery.{" "}
+          <button onClick={downloadRecovery}>Download recovery copy</button>
+        </div>
+      )}
+      {localStorageFailed && (
+        <div className="teach-warning" role="status">
+          This browser could not save a device copy. Keep the page open until
+          the server saves, or export the journal.
+        </div>
+      )}
+      {syncStatus !== "saved" && (
+        <div className="teach-warning">
+          {syncStatus === "saving"
+            ? "Saving your expedition…"
+            : syncStatus === "conflict"
+              ? "Another window has newer saved evidence. Keep a copy of this journal before opening it."
+              : localStorageFailed
+                ? "The server copy could not be updated. Export your journal before leaving."
+                : "Your expedition is saved on this device. The server copy could not be updated."}
+          {(syncStatus === "offline" || syncStatus === "conflict") && (
+            <button onClick={retrySync}>Try saving again</button>
+          )}
+          {syncStatus === "conflict" && (
+            <button
+              onClick={() => {
+                download(book);
+                cancelCoach();
+                setPlaying(false);
+                setTutorial(null);
+                setPicture(false);
+                setPage("journal");
+                loadServerCopy();
+              }}
+            >
+              Save my copy & open server journal
+            </button>
+          )}
+        </div>
+      )}
+      <main id="teach-main" tabIndex={-1}>
+        {page === "home" && (
+          <TeachHome
+            book={book}
+            go={go}
+            setModal={setModal}
+            onWarmUp={() => {
+              setBook((b) => ({
+                ...b,
+                returnDismissedAt: new Date().toISOString(),
+              }));
+              go("play");
+              showTutorial();
+            }}
+            onResume={() => {
+              setBook((b) => ({
+                ...b,
+                returnDismissedAt: new Date().toISOString(),
+              }));
+              go("play");
+            }}
+          />
+        )}
+        {page === "routes" && (
+          <div className="route-page">
+            <div className="page-intro">
+              <span className="eyebrow">CHAPTER 01 · THE SUMMIT PICNIC</span>
+              <h1>
+                Same summit.
+                <br />
+                <em>Your way there.</em>
+              </h1>
+              <p>
+                Twelve berries. Three friends. A picnic at the top.
+                <br />
+                Choose a route, then teach Pip how to share the basket fairly.
+              </p>
+            </div>
+            <div className="route-grid">
+              {(["ridge", "meadow"] as Route[]).map((r) => (
+                <article className="route-card" key={r}>
+                  <RouteArt route={r} />
+                  <div className="route-copy">
+                    <span className="eyebrow">
+                      {r === "ridge"
+                        ? "01 / A BEACON TO REPAIR"
+                        : "02 / A FRIEND TO WELCOME"}
+                    </span>
+                    <h2>{r === "ridge" ? "Beacon Ridge" : "Meadow Camp"}</h2>
+                    <p>
+                      {r === "ridge"
+                        ? "Turn the tower and teach Pip a share of the whole. Your beacon opens a high path."
+                        : "Teach Pip how to pass the berries around. At the next camp, another friend joins you."}
+                    </p>
+                    <div className="route-consequence">
+                      <Icon name={r === "ridge" ? "spark" : "leaf"} size={18} />
+                      <span>
+                        {r === "ridge"
+                          ? "Next: a smaller basket, the same three friends."
+                          : "Next: the same basket, four friends to share it."}
+                      </span>
+                    </div>
+                    <Button onClick={() => chooseRoute(r)}>
+                      Take {r === "ridge" ? "Beacon Ridge" : "Meadow Camp"}{" "}
+                      <Icon name="arrow" />
+                    </Button>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className="route-note">
+              <Icon name="compass" size={20} />
+              <p>
+                Both paths can work. You can try the other on another
+                expedition. Your journal keeps the story of each attempt.
+              </p>
+            </div>
           </div>
-        ) : (
-          <>
-            {screen === "explore" && (
-              <Explore
-                home={home}
-                onTower={() => go("tower")}
-                onPractice={(s) => go("arithmetic", s)}
-                onStory={(s) => go("story", s)}
-                onHelp={() => setHelp(true)}
-                reload={reload}
+        )}
+        {page === "play" && (
+          <TeachFlow
+            {...{
+              book,
+              route,
+              context,
+              guide,
+              showTutorial,
+              playing,
+              go,
+              pointTo,
+              run,
+              frame,
+              setPlaying,
+              setFrame,
+              visibleResult,
+              shownRemaining,
+              shownShares,
+              continueClimb,
+              reviseTeaching,
+              teach,
+              confirmTeaching,
+              choosePrediction,
+              beginRun,
+              ready,
+              picture,
+              showPicture,
+              askCoach,
+              coachBusy,
+              activeCoach,
+            }}
+          />
+        )}
+        {page === "summit" && (
+          <div className="summit-page">
+            <div className="summit-celebration">
+              <img
+                src="/art/summit-island.png"
+                alt="The expedition has reached the summit of the alpine island"
               />
-            )}
-            {(screen === "journey" || screen === "grownups") && (
-              <Reports
-                key={screen}
-                home={home}
-                grownup={screen === "grownups"}
-                onPlay={() => go("tower")}
-              />
-            )}
-            {screen === "tower" && (
-              <TowerGame
-                sound={prefs.sound}
-                onDone={() => go("journey")}
-                onExit={() => go("explore")}
-              />
-            )}
-            {(screen === "arithmetic" || screen === "story") && skill && (
-              <Arithmetic
-                key={`${screen}-${skill.id}`}
-                skill={skill}
-                story={screen === "story"}
-                sound={prefs.sound}
-                onExit={() => go("explore")}
-                onDone={() => go("journey")}
-              />
-            )}
-          </>
+              <div />
+              <section>
+                <span className="eyebrow">THE SUMMIT PICNIC · COMPLETE</span>
+                <Icon name="flag" size={40} />
+                <h1>
+                  You taught a way.
+                  <br />
+                  <em>They made it here.</em>
+                </h1>
+                <p>
+                  {route === "ridge"
+                    ? "Your beacon lights the ridge. Your teaching worked with a different basket."
+                    : "Lumi joined the picnic. You explored sharing with a different group."}
+                </p>
+                <Party names={contextFor(route, "transfer").companions} />
+                <Button onClick={() => go("journal")}>
+                  See the story of our thinking <Icon name="book" size={18} />
+                </Button>
+              </section>
+            </div>
+            <div className="summit-reflection">
+              <span className="eyebrow">
+                SOMETHING TO WONDER ABOUT TOGETHER
+              </span>
+              <h2>What would you teach differently next time?</h2>
+              <p>
+                A different path. Another idea. The same mountain, seen in a new
+                way.
+              </p>
+              <Button secondary onClick={() => setModal("new")}>
+                Explore another route <Icon name="compass" size={18} />
+              </Button>
+            </div>
+          </div>
+        )}
+        {page === "journal" && (
+          <TeachingJournal
+            storageStatus={
+              syncStatus === "saved"
+                ? "Saved to this journal server"
+                : syncStatus === "saving"
+                  ? "Saving to this journal server…"
+                  : "Server save needs attention"
+            }
+            {...{ book, setBook, go, download, summary }}
+            onCorrection={(receipt, id) => {
+              setCorrection(receipt);
+              setCorrectionRunId(id);
+              setCorrectionKind("context");
+              setCorrectionNote("");
+            }}
+          />
         )}
       </main>
-      {!playing && (
-        <footer className="site-footer">
-          <span>
-            <Icon name="mountain" size={17} />A little higher, every day.
-          </span>
-          <span>
-            Made for curious minds. <i /> K–5 math adventures
-          </span>
-          <button onClick={() => setSettings(true)}>
-            <Icon name="settings" size={15} />
-            Settings
-          </button>
-        </footer>
+      <footer className="teach-footer">
+        <span>
+          <Icon name="mountain" size={17} /> Your pace. Your path. Your
+          mountain.
+        </span>
+        <button onClick={() => setModal("grownups")}>
+          How the evidence works <Icon name="arrow" size={14} />
+        </button>
+      </footer>
+      <ActionBeacon
+        activityKey={`teaching:${book.expeditionId || "restored-expedition"}`}
+        target={guide.target}
+        message={guide.text}
+        enabled={
+          page === "play" &&
+          !tutorial &&
+          !modal &&
+          !correction &&
+          !playing &&
+          !coachBusy
+        }
+        resetKey={`${page}:${route}:${book.stage}:${book.plan.kind}:${JSON.stringify(book.plan)}:${book.planConfirmed}:${book.prediction}:${book.currentRunId}:${guide.step}`}
+        reducedMotion={reduced}
+      />
+      {tutorial && (
+        <QuickTutorial
+          kind={tutorial}
+          onClose={closeTutorial}
+          reducedMotion={reduced}
+        />
       )}
-      {settings && (
-        <Modal title="Make yourself at home" onClose={() => setSettings(false)}>
-          <p className="muted">
-            Little adjustments for your kind of adventure.
+      {toast && (
+        <div className="teach-toast" role="status">
+          {toast}
+        </div>
+      )}
+      {modal === "new" && (
+        <Modal
+          title="Another path, another possibility."
+          onClose={() => setModal(null)}
+        >
+          <p>
+            Your past teachings will stay in the journal. A new expedition
+            starts at basecamp.
           </p>
-          <div className="setting-row">
-            <span>
-              <Icon name="sound" />
-              Gentle game sounds
-            </span>
-            <button
-              role="switch"
-              aria-label="Gentle game sounds"
-              aria-checked={prefs.sound}
-              className={`switch ${prefs.sound ? "on" : ""}`}
-              onClick={() => setPrefs({ ...prefs, sound: !prefs.sound })}
-            >
-              <span />
-            </button>
+          <div className="modal-actions">
+            <Button onClick={newExpedition}>
+              Choose a new route <Icon name="arrow" />
+            </Button>
           </div>
-          <div className="setting-row">
-            <span>
-              <Icon name="leaf" />
-              Animated scenery
-            </span>
-            <button
-              role="switch"
-              aria-label="Animated scenery"
-              aria-checked={prefs.motion}
-              className={`switch ${prefs.motion ? "on" : ""}`}
-              onClick={() => setPrefs({ ...prefs, motion: !prefs.motion })}
-            >
-              <span />
-            </button>
-          </div>
-          <div className="setting-row">
-            <span>
-              <Icon name="sun" />
-              Extra contrast
-            </span>
-            <button
-              role="switch"
-              aria-label="Extra contrast"
-              aria-checked={prefs.contrast}
-              className={`switch ${prefs.contrast ? "on" : ""}`}
-              onClick={() => setPrefs({ ...prefs, contrast: !prefs.contrast })}
-            >
-              <span />
-            </button>
-          </div>
-          <p className="small muted">
-            Fraction Peaks and stories have no clock or hearts. Arithmetic
-            trails have three hearts and a two-minute bonus window that never
-            stops play. Buttons and your keyboard both work.
-          </p>
-          <Button onClick={() => setSettings(false)}>
-            Ready to explore <Icon name="arrow" />
-          </Button>
         </Modal>
       )}
-      {help && (
+      {modal === "settings" && (
         <Modal
-          title="Small steps. Real discoveries."
-          onClose={() => setHelp(false)}
+          title="Make a little room for you."
+          onClose={() => setModal(null)}
         >
-          <div className="how-step">
-            <span>01</span>
-            <div>
-              <h3>Find your adventure</h3>
-              <p>
-                Start with Fraction Peaks, or practice a number skill you know.
-              </p>
-            </div>
+          <div className="teach-settings">
+            <label>
+              <span>
+                Reduce motion
+                <small>Show Pip’s results without the animated replay.</small>
+              </span>
+              <input
+                type="checkbox"
+                checked={reduced}
+                onChange={(e) => setReduced(e.target.checked)}
+              />
+            </label>
+            <label>
+              <span>
+                Stronger contrast
+                <small>Brighter labels and clearer boundaries.</small>
+              </span>
+              <input
+                type="checkbox"
+                checked={contrast}
+                onChange={(e) => setContrast(e.target.checked)}
+              />
+            </label>
           </div>
-          <div className="how-step">
-            <span>02</span>
-            <div>
-              <h3>Think with your hands</h3>
-              <p>Turn each layer until every picture shows the same amount.</p>
+        </Modal>
+      )}
+      {modal === "grownups" && (
+        <Modal
+          title="A window into their thinking."
+          onClose={() => setModal(null)}
+        >
+          <div className="grownup-explanation">
+            <p>
+              Children teach Pip a way to share, predict a fair outcome, and
+              watch their instruction run. Changing a basket or a group gives
+              them something new to investigate.
+            </p>
+            <h3>Evidence you can inspect and correct.</h3>
+            <p>
+              The journal separates recorded actions, support, the child’s
+              words, and a tentative next step. Correcting a suggestion
+              withdraws its follow-up. A system misunderstanding is kept
+              separate from a learner mistake.
+            </p>
+            <h3>Small observations, useful questions.</h3>
+            <p>
+              These are session records, not a diagnosis, a learning-style
+              profile, or proof of lasting mastery. Ask what the child meant
+              before deciding what their choice reveals. New examples and
+              conversations help you check understanding.
+            </p>
+            <h3>Optional AI, bounded choices.</h3>
+            <p>
+              AI can select a context-appropriate question from reviewed
+              options. The game controls the quantities, rules, actions, and
+              evidence. Authored questions keep the adventure working without a
+              model. The source label shows what happened.
+            </p>
+            <div className="ai-setting">
+              <span>
+                <b>
+                  {health?.guardian_consent_ai
+                    ? "AI selection allowed"
+                    : "Authored questions selected"}
+                </b>
+                <small>
+                  {health?.configured_ai === "anthropic"
+                    ? "A provider is configured on this server."
+                    : "No live provider is currently confirmed."}{" "}
+                  Only structured teaching context is sent to AI. Notes and
+                  corrections stay with the local journal server.
+                </small>
+              </span>
+              <Button secondary disabled={aiBusy || !health} onClick={toggleAI}>
+                {aiBusy
+                  ? "Saving…"
+                  : health?.guardian_consent_ai
+                    ? "Use authored only"
+                    : "Allow optional AI"}
+              </Button>
             </div>
+            <h3>Local prototype.</h3>
+            <p>
+              This expedition saves to this local server, with a browser copy
+              for offline use. Other browsers connected to the same server can
+              open its saved journal. Export it to keep a separate copy.
+              Original practice records remain separate. This prototype has no
+              child accounts or protected multiuser access.
+            </p>
           </div>
-          <div className="how-step">
-            <span>03</span>
-            <div>
-              <h3>Make it your own</h3>
-              <p>
-                Ask Pip for help, then try a fresh challenge. Your journal
-                remembers both.
-              </p>
-            </div>
-          </div>
-          <div className="how-step">
-            <span>04</span>
-            <div>
-              <h3>Find your way back</h3>
-              <p>After five days away, you can choose a practice level one step easier. Your past achievements stay in your journal.</p>
-            </div>
-          </div>
-          <Button
-            onClick={() => {
-              setHelp(false);
-              go("tower");
+        </Modal>
+      )}
+      {correction && (
+        <Modal
+          title="Help the record tell the right story."
+          onClose={() => setCorrection(null)}
+        >
+          <p>
+            The observation stays visible. Your context will correct the
+            interpretation and withdraw its dependent question.
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              applyCorrection();
             }}
           >
-            Let's climb <Icon name="arrow" />
-          </Button>
-        </Modal>
-      )}
-    </div>
-  );
-}
-const skillMeta: Record<
-  string,
-  { name: string; land: string; icon: IconName; tone: string }
-> = {
-  add20: {
-    name: "Little additions",
-    land: "Meadow trail",
-    icon: "leaf",
-    tone: "mint",
-  },
-  sub20: {
-    name: "Take-away trail",
-    land: "Fern forest",
-    icon: "leaf",
-    tone: "mint",
-  },
-  place: {
-    name: "Tens & ones",
-    land: "Crystal caves",
-    icon: "spark",
-    tone: "lilac",
-  },
-  add100: {
-    name: "Bigger additions",
-    land: "Sunrise ridge",
-    icon: "sun",
-    tone: "peach",
-  },
-  sub100: {
-    name: "Subtraction steps",
-    land: "Moonlit valley",
-    icon: "moon",
-    tone: "lilac",
-  },
-  mul: {
-    name: "Multiplication",
-    land: "Alpine meadows",
-    icon: "sun",
-    tone: "peach",
-  },
-  div: {
-    name: "Share it equally",
-    land: "River crossing",
-    icon: "compass",
-    tone: "blue",
-  },
-};
-function Explore({
-  home,
-  onTower,
-  onPractice,
-  onStory,
-  onHelp,
-  reload,
-}: {
-  home: Home;
-  onTower: () => void;
-  onPractice: (s: Skill) => void;
-  onStory: (s: Skill) => void;
-  onHelp: () => void;
-  reload: () => Promise<void>;
-}) {
-  const [filter, setFilter] = useState("All trails"),
-    [choose, setChoose] = useState<Skill | null>(null),
-    [come, setCome] = useState(home.comeback.due),
-    [comeInfo, setComeInfo] = useState(false),
-    [comeBusy, setComeBusy] = useState(false),
-    [error, setError] = useState("");
-  const comeLock = useRef(false);
-  const applyComeback = async () => {
-    if (comeLock.current) return;
-    comeLock.current = true;
-    setComeBusy(true);
-    setError("");
-    try {
-      const comeback = await api("/comeback/apply", {});
-      if (comeback.applied) {
-        // The learner chose a gentler new round. Old assessments remain on
-        // the server, but an old harder round should not override that choice.
-        home.skills.forEach((s) => saveLocal(`summit.arithmetic.active.${s.id}`, null));
-      }
-      await reload();
-      setCome(false);
-      setComeInfo(false);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      comeLock.current = false;
-      setComeBusy(false);
-    }
-  };
-  const visible = home.skills.filter((s) =>
-    filter === "All trails" || filter === "Early explorers"
-      ? filter === "All trails" || ["add20", "sub20", "place"].includes(s.id)
-      : ["add100", "sub100", "mul", "div"].includes(s.id),
-  );
-  const startStory = () => {
-    const s = home.skills.find((s) => s.id === "mul") || home.skills[0];
-    onStory(s);
-  };
-  return (
-    <div className="explore-page">
-      <section className="hero-world" aria-labelledby="hero-heading">
-        <img
-          src="/art/summit-island.png"
-          alt="A tiny alpine world with glowing stepping stones winding up to a snowy summit"
-          className="hero-art"
-        />
-        <div className="hero-vignette" />
-        <div className="hero-content">
-          <div className="eyebrow">
-            <span className="live-dot" /> BIG DISCOVERIES START SMALL
-          </div>
-          <h1 id="hero-heading">
-            A little curiosity.
-            <br />A whole new <br />
-            <span>altitude.</span>
-          </h1>
-          <p>
-            Turn “I can't” into “I did.”
-            <br />
-            One playful math adventure at a time.
-          </p>
-          <Button onClick={onTower}>
-            Let's climb <Icon name="arrow" size={19} />
-          </Button>
-          <div className="hero-footnote">
-            <Icon name="leaf" size={15} />
-            Your pace. Your path. Your mountain.
-          </div>
-        </div>
-        <div className="map-label label-summit">
-          <span className="marker" />
-          <span>
-            THE SUMMIT<small>There’s a little more in you.</small>
-          </span>
-        </div>
-        <div className="map-label label-camp">
-          <span className="camp-icon">
-            <Icon name="flag" size={17} />
-          </span>
-          <span>
-            BASECAMP<small>Your adventure starts here</small>
-          </span>
-        </div>
-        <div className="hero-coordinate">
-          EST. FOR EXPLORERS <span>✦</span> 01 / ∞
-        </div>
-      </section>
-      <div className="welcome-strip">
-        <span className="welcome-avatar">
-          <Icon name="sun" size={20} />
-        </span>
-        <div>
-          <strong>
-            Hey, {home.learner.display_name}. Ready for a little wonder?
-          </strong>
-          <span>You don't have to be fast. Just curious.</span>
-        </div>
-        <button onClick={onHelp}>
-          How it works <Icon name="arrow" size={17} />
-        </button>
-      </div>
-      <section className="return-trail" aria-labelledby="return-heading">
-        <div className="return-trail-mark" aria-hidden="true"><Icon name="refresh" size={36} /><span><Icon name="leaf" size={17} /></span></div>
-        <div className="return-trail-copy">
-          <div className="eyebrow">THERE'S A WAY BACK, TOO</div>
-          <h2 id="return-heading">A new day. A softer first step.</h2>
-          <p>After five days away, choose an easier practice level to find your footing. Your past achievements stay in your journal.</p>
-        </div>
-        <button className="return-trail-action" onClick={() => home.comeback.due ? setCome(true) : setComeInfo(true)}>
-          <span>{home.comeback.due ? "Your return trail is ready" : "A little help returning"}</span>
-          {home.comeback.due ? "Choose my way back" : "How a comeback works"} <Icon name="arrow" size={17} />
-        </button>
-      </section>
-      <section className="adventures-section">
-        <div className="section-heading">
-          <div>
-            <div className="eyebrow">FIND YOUR NEXT “AHA!”</div>
-            <h2>Choose a little adventure.</h2>
-          </div>
-          <span className="quiet-pill">
-            <span className="live-dot" /> A path for every kind of day.
-          </span>
-        </div>
-        <div className="adventure-grid">
-          <button className="adventure-card featured" onClick={onTower}>
-            <div className="card-copy">
-              <span className="badge mint">
-                <Icon name="spark" size={13} />
-                THE FEATURED CLIMB
-              </span>
-              <h3>
-                Different pieces.
-                <br />
-                Same big idea.
-              </h3>
-              <p>
-                Spin a tower. Find a match.
-                <br />
-                Discover the magic of fractions.
-              </p>
-              <div className="card-meta">
-                FRACTIONS <i /> GRADE 4 <i /> 5 STOPS
-              </div>
-              <span className="text-link">
-                Explore Fraction Peaks <Icon name="arrow" size={17} />
-              </span>
+            <label className="field-label" htmlFor="correction-kind">
+              What needs correcting?
+            </label>
+            <select
+              id="correction-kind"
+              value={correctionKind}
+              onChange={(e) =>
+                setCorrectionKind(e.target.value as "context" | "system")
+              }
+            >
+              <option value="context">
+                The suggestion missed my intention
+              </option>
+              <option value="system">
+                Pip or the interface misunderstood my instruction
+              </option>
+            </select>
+            <label className="field-label" htmlFor="correction-note">
+              What should we know?
+            </label>
+            <textarea
+              id="correction-note"
+              value={correctionNote}
+              maxLength={500}
+              onChange={(e) => setCorrectionNote(e.target.value)}
+              placeholder="I was trying something on purpose…"
+              required
+            />
+            <small>
+              This context saves to the local journal server and is not sent to
+              AI. System issues are excluded from learner-performance claims.
+            </small>
+            <div className="modal-actions">
+              <Button type="submit" disabled={!correctionNote.trim()}>
+                Save context & withdraw follow-up{" "}
+                <Icon name="check" size={17} />
+              </Button>
             </div>
-            <div className="mini-tower" aria-hidden="true">
-              <span className="tower-star">✧</span>
-              <div className="mini-layer layer-one">½</div>
-              <div className="mini-layer layer-two">
-                <i />
-                <i />
-                <i />
-                <i />
-              </div>
-              <div className="mini-layer layer-three">²⁄₄</div>
-              <div className="mini-plinth" />
-            </div>
-          </button>
-          <button
-            className="adventure-card story-card"
-            onClick={startStory}
-            disabled={!home.story_missions_enabled}
-          >
-            <span className="badge peach">
-              <Icon name="book" size={13} />
-              STORY EXPEDITION
-            </span>
-            <div className="story-orbit" aria-hidden="true">
-              <div className="planet">
-                <span />
-              </div>
-              <span className="orbit-star s1">✦</span>
-              <span className="orbit-star s2">✧</span>
-              <span className="orbit-dot" />
-              <div className="orbital-ring" />
-            </div>
-            <h3>
-              A problem.
-              <br />A thousand possibilities.
-            </h3>
-            <p>
-              Space explorer or ocean adventurer?
-              <br />
-              Make math part of your story.
-            </p>
-            <span className="text-link">
-              Choose your world <Icon name="arrow" size={17} />
-            </span>
-          </button>
-        </div>
-      </section>
-      <section className="practice-section">
-        <div className="section-heading">
-          <div>
-            <div className="eyebrow">BUILD YOUR FOOTING</div>
-            <h2>Small steps. Strong foundations.</h2>
-          </div>
-          <div className="filter-pills" aria-label="Filter practice trails">
-            {["All trails", "Early explorers", "Growing climbers"].map((f) => (
-              <button
-                key={f}
-                aria-pressed={filter === f}
-                className={filter === f ? "selected" : ""}
-                onClick={() => setFilter(f)}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="skill-grid">
-          {visible.map((s) => {
-            const m = skillMeta[s.id];
-            return (
-              <button
-                key={s.id}
-                className={`skill-card ${m.tone}`}
-                onClick={() => setChoose(s)}
-              >
-                <div className="skill-icon">
-                  <Icon name={m.icon} size={23} />
-                </div>
-                <div>
-                  <span className="skill-land">{m.land}</span>
-                  <h3>{m.name}</h3>
-                  <span className="skill-detail">
-                    Grade {s.grade} <i /> Level {s.level}
-                  </span>
-                </div>
-                <Icon name="arrow" size={17} />
-                <div className="skill-progress">
-                  <span style={{ width: `${(s.run / 3) * 100}%` }} />
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-      <section className="pip-banner">
-        <Owl />
-        <div>
-          <h3>You've got a trail buddy.</h3>
-          <p>
-            Pip is here with a little nudge whenever you need one. Asking for
-            help is part of the climb.
-          </p>
-        </div>
-        <span className="handwritten">Let's figure it out, together.</span>
-      </section>
-      {choose && (
-        <Modal
-          title={skillMeta[choose.id].name}
-          onClose={() => setChoose(null)}
-        >
-          <span className="badge mint">
-            GRADE {choose.grade} · LEVEL {choose.level}
-          </span>
-          <h3 className="modal-lead">A little practice goes a long way.</h3>
-          <p className="muted">
-            Seven little challenges and three hearts. A wrong answer uses one
-            heart; after three, start fresh with your level still unlocked.
-          </p>
-          <div className="practice-rules">
-            <span><Icon name="spark" size={17} /><span>Finish all seven within two minutes for <strong>+50 points</strong>. After that, keep playing. Your points are safe.</span></span>
-            <span><Icon name="mountain" size={17} /><span>Three correct, independent answers in a row at your current level unlock the next one.</span></span>
-          </div>
-          <div className="tip-box">
-            <Owl small />
-            <p>{choose.tip}</p>
-          </div>
-          <Button onClick={() => onPractice(choose)}>
-            {readLocal<{round_id?: string} | null>(`summit.arithmetic.active.${choose.id}`, null)?.round_id ? "Resume this trail" : "Start this trail"} <Icon name="arrow" />
-          </Button>
-          <Button
-            secondary
-            onClick={() => onStory(choose)}
-            disabled={!home.story_missions_enabled}
-          >
-            Make it a story <Icon name="book" />
-          </Button>
-        </Modal>
-      )}
-      {(come || comeInfo) && (
-        <Modal title={home.comeback.due ? "Good to see you again." : "Your trail will be here."} onClose={() => {
-          if (!comeBusy) { setCome(false); setComeInfo(false); }
-        }}>
-          <Owl />
-          <p className="muted">
-            {home.comeback.due ? `It's been ${home.comeback.days_away} days. We` : "After five days away, we"} can ease each practice skill by one level, never below level one, to help you find your footing.
-            You choose whether to take the gentler trail. Your past achievements stay in your journal.
-          </p>
-          <p className="small muted">Choosing the gentler trail starts fresh practice at that level. Answers from unfinished trails stay in your history.</p>
-          {home.comeback.due && <p>
-            {home.comeback.freeze_available
-              ? "Your streak protection is ready."
-              : "A fresh start is always welcome."}
-          </p>}
-          {error && <p role="alert">{error}</p>}
-          {home.comeback.due && <Button onClick={() => void applyComeback()} disabled={comeBusy}>
-            {comeBusy ? "Finding your footing…" : "Take the gentle trail"} <Icon name="leaf" />
-          </Button>}
-          <Button secondary={home.comeback.due} disabled={comeBusy} onClick={() => { setCome(false); setComeInfo(false); }}>
-            {home.comeback.due ? "Keep my current challenge" : "Ready for my next little adventure"}
-          </Button>
+          </form>
         </Modal>
       )}
     </div>

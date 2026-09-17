@@ -1,14 +1,15 @@
 {
-  "name": "summit-math",
+  "name": "summit-teach",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.5.3",
+  "type": "module",
   "workspaces": [
     "server",
     "web"
   ],
   "scripts": {
     "dev": "concurrently -k -n api,web -c blue,green \"npm run dev -w server\" \"npm run dev -w web\"",
-    "test": "npm test -w server && node --test web/test/fractions.test.ts",
+    "test": "npm test -w server && node --test web/test/*.test.ts",
     "eval": "npm run eval -w server",
     "start": "npm run start -w server",
     "build": "npm run build -w web",

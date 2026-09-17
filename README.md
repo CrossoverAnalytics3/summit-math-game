@@ -1,32 +1,47 @@
-# Summit
+# Summit — Teach the Climb
 
-**Understand the math. Earn the climb.**
+**Teach Pip your way. Reach the summit together.**
 
-Summit is a mountain adventure for the **K–5 Math Game** challenge. Practice addition, subtraction, place value, multiplication, and division on arithmetic trails. In **Fraction Peaks**, turn a fraction symbol, shaded model, and number line until they agree. Correct math earns progress; Pip helps make the next attempt understandable.
+Summit is a playful teaching adventure for children and a window into their thinking for parents and tutors. Lead Pip and friends up the original alpine world: choose a route, teach a sharing plan, predict a fair share, and adapt when the expedition changes. The journal makes the journey inspectable—and lets the learner correct its interpretation.
 
-[Run locally](#run) · [Walk through the product](docs/PRODUCT-WALKTHROUGH.md) · [Explore the architecture](docs/ARCHITECTURE.md)
+<img src="web/public/art/summit-island.png" width="760" alt="Summit's original floating alpine mountain, with a glowing trail from a warm basecamp to the snowy summit.">
 
-<img src="web/public/art/summit-island.png" width="760" alt="Summit's original hero mountain: a floating, snow-covered alpine island with a glowing path from the cozy basecamp to a flag at the summit.">
+[Run locally](#run) · [Product and success criteria](docs/PRODUCT-GUIDE.md) · [Prompt fit](docs/PROMPT-FIT.md) · [Architecture](docs/ARCHITECTURE.md) · [Three-minute demo](docs/DEMO.md)
 
-## The challenge that guides the product
+## The problem
 
-> Develop an interactive, gamified math experience tailored for elementary students that makes foundational arithmetic concepts both intuitive and engaging.
->
-> We're looking for: innovative mechanics that encourage steady progression and reward mastery of core numeracy skills.
+**A correct answer does not show a parent or tutor what a child intended, how they reasoned, or which support helped them move forward.** The child needs an enjoyable way to make those ideas concrete; the adult needs evidence for a useful next conversation.
 
-The design loop is **explore a mathematical relationship → try it → receive useful feedback → earn progress → apply it again**. The mountain, tower, Pip, rewards, stories, journal, and comeback all serve that loop. [Prompt-to-feature mapping](docs/HACKATHON.md#how-the-experience-answers-the-prompt)
+Summit's working hypothesis is that teaching a character, watching an instruction execute, and explaining a revision can reveal more useful evidence than answer counts alone. The first learner focus is ages 8–10 exploring equal sharing. This is an **Open-category** learning product: one learner, one concrete problem, and a working experience to demonstrate. It retains math as the first subject while making teaching the central mechanic.
 
-## Problem and product hypothesis
+## One expedition, meaningful choices
 
-**Answer-only practice can hide whether a child understands the number relationship or how much help they needed.** The design challenge is to make that relationship understandable through play and give the child a rewarding, manageable next step.
+**The Summit Picnic** starts with twelve berries and three friends. The learner can teach a fixed amount, a repeated sharing round, or a fraction of the basket. Pip follows the accepted instruction; quantities and outcomes come from code.
 
-The hypothesis: directly manipulating equivalent representations makes the relationship visible, while short arithmetic rounds reward independent performance with points and new levels. Fraction Peaks demonstrates the visual mechanic in depth; arithmetic trails apply progression to core numeracy. The journal preserves evidence of help and first attempts.
+| Decision         | What changes                                                      | What the learner can investigate                                             |
+| ---------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| **Beacon Ridge** | The next basket contains nine berries for the same three friends. | Does a plan built around a fixed quantity still work when the whole changes? |
+| **Meadow Camp**  | A fourth friend joins the original twelve-berry basket.           | Does the same instruction adapt to a different group?                        |
 
-Comeback supports continuity within this adventure: after five days away, a returning learner can choose arithmetic practice one level lower, retain history, and use an available streak freeze. It appears after a return. These design hypotheses still need evaluation with learners, parents, and tutors.
+Both routes reach an **eight-berry, four-friend summit check**. The home trail makes **first teaching → changed situation → summit check** visible and retains the fair shares observed along each route. A child returning to an unfinished expedition after five days can replay a small teaching example or continue from the saved camp. Earlier progress remains intact.
+
+Fair-share predictions, runs, support, revisions, and the learner's own account belong to the record. The **tutor brief** brings four questions onto one card: what was demonstrated, what remains uncertain, what support appeared, and what to ask next. Its evidence links lead to the underlying runs. At least two distinct eligible observations are required before an interpretation is proposed; two observations still do not prove a pattern. A correction withdraws dependent questions while preserving the original replay.
+
+The original fraction tower and arithmetic activities remain accessible through **A little practice at basecamp**, under **THE ORIGINAL TRAILS**. Arithmetic trails unlock levels through their own consecutive-correct, no-hint rule. The expedition rewards fair sharing across changed situations; these are session accomplishments, not a claim of lasting mastery. The two evidence systems remain separate. [Clause-by-clause prompt fit](docs/PROMPT-FIT.md)
+
+## Two ways to make practice your own
+
+**Fix Pip’s homework:** inspect three worked problems, find the one that slipped, explain why, and fix it. The tutor brief links separate found / named / fixed observations to the worksheet and the child’s response. These supported examples do not count as independent trail mastery. Worksheets are generated for the same skill and level; matching a child’s actual session mistake is future work.
+
+**Your rules:** choose one or three hearts, a bonus clock or no clock, easier or harder numbers, and a digit to avoid. The server enforces the choices. Easier always stays practice, including at level one. [Play levers and evidence boundaries](docs/PLAY-LEVERS.md)
+
+## A clear first step
+
+The expedition, fraction tower and arithmetic activities open with a four-step visual tutorial using a separate, unsaved example. Children can replay a step, finish with **I’m ready**, or choose **Skip for now**; **Show me how** brings it back. During play, a short guide follows the next action. Pip offers a gentle control highlight after ten seconds without interaction, waits thirty seconds before a second nudge, and then stops automatic nudges for that activity. **Show me** brings the control into view without choosing an answer. [Quick guide to the tutorials and controls](docs/ONBOARDING.md)
 
 ## Run
 
-**Node.js 24 or newer is required.** From the repository root:
+**Node.js 24 or newer is required.** From this repository's root:
 
 ```sh
 npm ci
@@ -34,46 +49,38 @@ npm run build
 npm start
 ```
 
-Open **http://127.0.0.1:3001**, choose **Let's climb**, and play. SQLite is built into Node 24; no separate database, account, or AI key is needed. The local server creates the synthetic demo profile automatically.
+Open **http://127.0.0.1:3013**. No AI key is required for the authored experience. The included `.nvmrc` selects Node 24. Keep development dependencies installed because the server uses `tsx`.
 
-For development, run `npm run dev` and open **http://127.0.0.1:5174**. The included `.nvmrc` selects Node 24. Keep development dependencies installed: the server runs TypeScript through `tsx`. More setup and API details are in the [server guide](server/README.md).
+For optional AI, copy the root `.env.example` to a private root `.env`, set your own `ANTHROPIC_API_KEY`, and restart. Open **For grown-ups → Allow optional AI**. In this expedition, the model selects a question and Pip line from authored options; the badge distinguishes **AI-SELECTED QUESTION** from **AUTHORED QUESTION**. Never commit `.env`; `.gitignore` excludes it. See [architecture and data boundaries](docs/ARCHITECTURE.md) before using actual learner information.
 
-## A climb worth exploring
+## How it is built
 
-- **Fraction Peaks:** three towers connect equivalent fractions across symbols, same-size shaded wholes, and number lines. A subdivision scaffold makes the unchanged amount visible. Two session checks follow.
-- **Seven arithmetic trails:** seven distinct questions, three hearts, and a two-minute bonus window. A third miss ends the round without lowering a level. Answering all seven questions with a heart remaining before the window closes earns 50 bonus points; expiry alone never ends play.
-- **Earned progression:** three consecutive correct answers without hints at the current arithmetic difficulty unlock the next level, up to level 10. A hint or miss resets that run, while already unlocked levels remain. Supported correct answers still earn points.
-- **Four story worlds:** space, ocean, dinosaurs, and animals turn a single arithmetic problem into a small story. These rounds have no timer or hearts.
-- **Field journal:** completed practice, first-attempt checks without hints, and supported work stay distinct. Save or resume a fraction climb and export the session record.
-- **Comfort controls:** keyboard and touch controls, optional sound, motion and contrast settings, and browser read-aloud where available. Fraction Peaks stays untimed and heart-free.
+| Layer                               | Responsibility                                                                                                                                                                                                                  |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **React + TypeScript frontend**     | Separate home, teaching-flow and journal components; mountain routes, guided controls, replay, visible progression and a traceable tutor brief.                                                                                 |
+| **Shared deterministic engine**     | Exact quantities, executable plans, route consequences, replay records, the two-observation floor and correction dependencies.                                                                                                  |
+| **Node + Express + SQLite backend** | Recomputes saved runs, preserves observed inputs, stores the teaching journal, detects conflicting writes and bounds optional AI requests. Arithmetic remains server-owned.                                                     |
+| **Optional AI**                     | Selects a question and Pip line from bounded authored banks using a recomputed simulation. It cannot write report claims, change mathematical truth, or grade the learner. Authored selection preserves the complete play flow. |
 
-The [product walkthrough](docs/PRODUCT-WALKTHROUGH.md) explains each flow, scoring rule, and design tradeoff.
+The worksheet flow uses a short Find → Explain → Fix guide.
 
-## How the build works
+Teaching Pip changes the instructions it follows. It does **not** retrain a foundation model.
 
-| Layer | Responsibility and reason |
-|---|---|
-| **Frontend — React, TypeScript, Vite** | Renders the tower, models, controls, and journal. The browser checks fraction equivalence with exact integer math, selects authored feedback, and saves fraction sessions locally for resume and review. |
-| **Backend — Express, Node 24, SQLite** | Generates arithmetic problems and stores their answers. The browser sends a problem ID and response; the server owns assessment, hint use, hearts, bonus timing, scores, progression, and recovery. Repeated requests cannot award progress twice. |
-| **Optional AI — server-side Anthropic adapter** | Adds arithmetic stories, hints, and parent guidance around code-generated math. Numeric/format checks screen the text; missing access, failed requests, timeout, or rejected output selects authored content. The source label exposes that choice. Fraction coaching is authored. |
+The journal saves to the local server, with a browser cache for offline work. Other browsers connected to that same server can read saved evidence. Conflicting edits require review, and unreadable local records are preserved for recovery. This is one local demonstration workspace, not an authenticated learner account or a hosted cross-device service. [Persistence contract](docs/TEACHING-PERSISTENCE.md) · [Architecture and AI boundaries](docs/ARCHITECTURE.md)
 
-Fraction records live in browser storage; arithmetic records live in local SQLite. The [architecture](docs/ARCHITECTURE.md) traces both paths and their boundaries. AI does not decide mathematical correctness or game progression.
+## What success means
 
-## Success criteria and evidence
+| Goal                                | Observable criterion                                                                                                                              | Current evidence                                                                                                                  |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **Trustworthy execution**           | Pip follows the accepted plan; every berry is accounted for; route consequences match the displayed situation.                                    | 52,500 bounded teaching simulations check conservation and trace consistency. Saved run results are recomputed by the server.     |
+| **Correctable evidence**            | A disputed interpretation remains identifiable, and its dependent suggestion is withdrawn without erasing the original observation.               | Automated checks cover targeted corrections, dependent withdrawal, the evidence floor, immutable observations and durable reload. |
+| **Usable teaching**                 | In an initial supervised pilot, at least four of five children create and run a plan within five minutes without an adult operating the controls. | Proposed target; no learner study conducted.                                                                                      |
+| **Understanding beyond completion** | Record each child's unaided prediction and explanation on three new sharing situations, with baseline and later comparison tasks.                 | Proposed measure; success thresholds should be revised after the pilot.                                                           |
+| **Useful adult guidance**           | At least four of five participating adults identify the supporting event for a report item and choose a relevant follow-up task.                  | Proposed target; no adult evaluation conducted.                                                                                   |
 
-| Goal | Success criterion | Evidence and status |
-|---|---|---|
-| **Make the math interaction reliable** | Only equivalent representations light a beacon; feedback targets a mismatch; subdivision preserves the whole and amount. | Implemented; fraction tests and documented browser walkthroughs. |
-| **Reward demonstrated skill with progression** | Three consecutive unhinted correct answers at the current arithmetic difficulty unlock the next level. Easier leftover questions cannot keep unlocking levels; timing alone never unlocks one. | Implemented; progression tests and the documented three-answer level-unlock walkthrough. This is the game's performance rule; longer-term mastery is evaluated separately. |
-| **Keep the record trustworthy** | Hints and retries cannot become independent success; arithmetic answers and repeated requests follow the scoring, recovery, and progression rules. | Implemented; **82 tests and 17,952 deterministic checks pass** across the release. See [QA](docs/QA.md). |
-| **Support independent understanding** | On unseen tasks appropriate to the practiced skill, learners solve arithmetic or match equivalent fractions without hints and explain their reasoning; check again later with different items. | Proposed learner evaluation: record correct unassisted responses / attempted items, explanation quality, and pre/post/delayed results. No learner results yet. |
-| **Make restarting manageable** | Eligible returning learners can begin appropriate practice and work through all seven questions, while feeling comfortable asking for help. | Proposed evaluation: starts / eligible return visits; all-seven-answer rate among starts; accuracy, heart endings, help use, and learner feedback. This measures continuation after a return. |
+If controls obstruct teaching, simplify the controls. If the controls work but changed situations expose weak understanding, revise the scaffold and compare a new example. If adults misread a journal entry, revise the wording and evidence display before adding more AI. [Full measurement and iteration plan](docs/PRODUCT-GUIDE.md#measure-and-iterate)
 
-**Measure today:** the journal separates completed towers, correct first-attempt checks without help, and supported successes. Its two checks repeat, so the counts describe this session. Arithmetic records provide assessed answers, hint use, and round results. These local stores are not a cohort analytics system; learner studies and return-flow instrumentation are still to build.
-
-**Iterate from the evidence:** observe controls first; simplify them if they block progress. If controls work but unseen equivalence tasks fail, revise the scaffold and item sequence. If returning learners start but stop early, examine difficulty, hearts, and the bonus. Observe help-seeking as well as completion—less help is not automatically better. Review AI meaning and suitability separately from its format checks. The [measurement plan](docs/PRODUCT-WALKTHROUGH.md#5-measure-and-iterate) defines the denominators and next experiments.
-
-## Verify
+## Verify and review
 
 ```sh
 npm run check:repo
@@ -83,20 +90,14 @@ npm run eval
 npm run build
 ```
 
-The **Verify Summit** workflow runs these checks on Node 24. See the [current verification record](docs/QA.md) for results, scenarios, and remaining coverage. These commands check software behavior and content rules; learner outcomes need a separate study.
+**264 tests pass:** 176 server tests and 88 web tests. These cover server-owned arithmetic, durable teaching records, correction dependencies, guidance, tutor evidence, worksheet generation and assessment, and child-selected rules. Teaching tests include **52,500 bounded simulations**. Worksheet checks cover **2,100 generated sets**; rule checks exercise **6,300 rounds** with an excluded digit. The separate arithmetic evaluation passes **17,952 checks**. [Verification](docs/VERIFICATION.md) distinguishes software checks, browser walkthroughs, and proposed learner studies.
 
-## AI, evidence, and release scope
+The [demo guide](docs/DEMO.md) provides a three-minute narration and screen sequence. The [GitHub guide](docs/GITHUB.md) explains how to update a repository while preserving the previous release.
 
-Numeric and format checks bound AI output, but cannot establish every story's meaning or suitability.
+## Scope and attribution
 
-To try live AI, copy `.env.example` to a private `.env`, add your own `ANTHROPIC_API_KEY`, restart, and enable **For grown-ups → Optional AI features**. AI starts off. Missing access, provider failure, timeout, or rejected output uses authored content. Keep real keys out of Git and browser code; the example model alias is `claude-sonnet-4-5`.
+This first equal-sharing expedition has a small authored encounter set. Its fixed summit check is a local transfer observation, not an unseen assessment or proof of durable mastery. Its session observations do not establish enduring abilities, personality, or learning gains. Learner testing and appropriate data/access controls are needed before broader use. Keep demonstration notes free of identifiable child information.
 
-This release covers selected elementary arithmetic skills and a Grade 4 fraction-equivalence focus; it is a scoped entry for the K–5 prompt, not a complete curriculum for every grade. It runs locally with one synthetic learner. Accounts, guardian verification, shared storage, and protected administration are needed before public multiuser use. Learning gains, delayed retention, and comeback outcomes remain to be evaluated. [Architecture](docs/ARCHITECTURE.md) and [QA](docs/QA.md) describe the practical limits.
+I built the foundation with Claude, then iterated with Codex. AI coding tools did most of the typing; the product direction and review were mine. This iteration retains the original alpine artwork and practice activities while changing the main experience to learning through teaching. [Current disclosure](docs/DISCLOSURES.md) distinguishes the new work from the [archived release documentation](docs/legacy/).
 
-## Built with AI, directed by a person
-
-> I built the foundation with ChatGPT/Claude, then iterated with Codex. AI coding tools did most of the typing; the product decisions, the thesis, and the review were mine.
-
-The alpine scenery was generated with an AI image tool; the tower, Pip, icons, and mathematical models use SVG/CSS/React. The [development record](docs/DEVELOPMENT-RECORD.md), [AI/material disclosure](docs/DISCLOSURES.md), and [artwork record](docs/ARTWORK.md) make those contributions explicit.
-
-The project uses the [MIT License](LICENSE). Third-party materials retain their own terms; see [licensing](docs/LICENSING.md), the [dependency inventory](docs/DEPENDENCIES.md), and [package notices](docs/materials/THIRD_PARTY_NOTICES.txt). The [challenge guide](docs/HACKATHON.md) keeps submission context separate from the product walkthrough.
+Source code uses the [MIT License](LICENSE). Dependencies and other materials retain their terms; the [existing inventory](docs/materials/dependency-inventory-with-sources.md) and [notices](docs/materials/THIRD_PARTY_NOTICES.txt) remain included.
