@@ -8,12 +8,6 @@ Summit is a playful teaching adventure for children and a window into their thin
 
 [Run locally](#run) · [Product and success criteria](docs/PRODUCT-GUIDE.md) · [Prompt fit](docs/PROMPT-FIT.md) · [Architecture](docs/ARCHITECTURE.md) · [Three-minute demo](docs/DEMO.md)
 
-## The problem
-
-**A correct answer does not show a parent or tutor what a child intended, how they reasoned, or which support helped them move forward.** The child needs an enjoyable way to make those ideas concrete; the adult needs evidence for a useful next conversation.
-
-Summit's working hypothesis is that teaching a character, watching an instruction execute, and explaining a revision can reveal more useful evidence than answer counts alone. The first learner focus is ages 8–10 exploring equal sharing. This is an **Open-category** learning product: one learner, one concrete problem, and a working experience to demonstrate. It retains math as the first subject while making teaching the central mechanic.
-
 ## One expedition, meaningful choices
 
 **The Summit Picnic** starts with twelve berries and three friends. The learner can teach a fixed amount, a repeated sharing round, or a fraction of the basket. Pip follows the accepted instruction; quantities and outcomes come from code.
@@ -39,6 +33,7 @@ The original fraction tower and arithmetic activities remain accessible through 
 
 The expedition, fraction tower and arithmetic activities open with a four-step visual tutorial using a separate, unsaved example. Children can replay a step, finish with **I’m ready**, or choose **Skip for now**; **Show me how** brings it back. During play, a short guide follows the next action. Pip offers a gentle control highlight after ten seconds without interaction, waits thirty seconds before a second nudge, and then stops automatic nudges for that activity. **Show me** brings the control into view without choosing an answer. [Quick guide to the tutorials and controls](docs/ONBOARDING.md)
 
+
 ## Run
 
 **Node.js 24 or newer is required.** From this repository's root:
@@ -52,6 +47,12 @@ npm start
 Open **http://127.0.0.1:3013**. No AI key is required for the authored experience. The included `.nvmrc` selects Node 24. Keep development dependencies installed because the server uses `tsx`.
 
 For optional AI, copy the root `.env.example` to a private root `.env`, set your own `ANTHROPIC_API_KEY`, and restart. Open **For grown-ups → Allow optional AI**. In this expedition, the model selects a question and Pip line from authored options; the badge distinguishes **AI-SELECTED QUESTION** from **AUTHORED QUESTION**. Never commit `.env`; `.gitignore` excludes it. See [architecture and data boundaries](docs/ARCHITECTURE.md) before using actual learner information.
+
+## The problem
+
+**A correct answer does not show a parent or tutor what a child intended, how they reasoned, or which support helped them move forward.** The child needs an enjoyable way to make those ideas concrete; the adult needs evidence for a useful next conversation.
+
+Summit's working hypothesis is that teaching a character, watching an instruction execute, and explaining a revision can reveal more useful evidence than answer counts alone. The first learner focus is ages 8–10 exploring equal sharing. This is an **Open-category** learning product: one learner, one concrete problem, and a working experience to demonstrate. It retains math as the first subject while making teaching the central mechanic.
 
 ## How it is built
 
