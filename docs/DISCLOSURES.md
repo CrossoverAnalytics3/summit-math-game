@@ -2,9 +2,9 @@
 
 ## Development contribution
 
-I built the foundation with Claude, then iterated with Codex. AI coding tools did most of the typing; the product direction and review were mine.
+I built the foundation with ChatGPT and Claude, then iterated with Codex. AI coding tools did most of the typing; the product direction and review were mine.
 
-The original Summit supplied the alpine mountain, Pip, fraction tower, arithmetic practice, existing reporting, and local server. This iteration changes the main experience to teaching Pip through an expedition with visible consequences and correctable evidence. AI coding assistance produced implementation, documentation, and bounded review under the user's direction. Final verification belongs in [VERIFICATION.md](VERIFICATION.md).
+My original Summit foundation included the alpine mountain, Pip, fraction tower, arithmetic practice, existing reporting, and local server. This iteration changes the main experience to teaching Pip through an expedition with visible consequences and correctable evidence. AI coding assistance produced implementation, documentation, and bounded review under the user's direction. Final verification belongs in [VERIFICATION.md](VERIFICATION.md).
 
 The [legacy documents](legacy/) are an archive of the earlier release. Their descriptions, dates, and test totals are historical; they are not automatically current claims about Teach the Climb.
 
@@ -22,12 +22,14 @@ The project source uses the root MIT license; other materials retain their own t
 
 Teaching Pip means changing the supported instructions it executes. It does not train or fine-tune the underlying language model. In the new expedition, the optional provider selects a question and Pip line from finite authored banks. It does not write the journal's observations or tentative next steps. Deterministic code owns quantities and results. Authored selection keeps the experience usable.
 
+The arithmetic activities also use generative AI for themed problem stories, strategy hints, and parent-note wording. Their validators check response shape, length, and permitted digits. Provenance records the provider, prompt version, fields sent, check results, and final source; authored content supplies fallback. These structural checks do not establish complete semantic correctness. Arithmetic facts and scores remain computed by the server.
+
 Source labels should reflect the returned content. A configured key is not proof that a response came from the model. A passing response validator is not proof that every interpretation is correct. The child or adult can dispute an interpretation, and downstream guidance must respond to that correction.
 
 This release was browser-tested with authored questions. No live provider call is claimed; provider behavior is covered through automated adapter tests.
 
 ## Data and scope
 
-No real child records, interview files, private training corpus, biometric input, or provider credentials are needed in the source package or demo. Use synthetic demonstration data and avoid identifiable information in notes. Optional AI receives the structured context, plan, recomputed result, and booleans for recorded prediction/support. It does not receive learner notes, correction text, the evidence ID, or prior-session history. The [architecture](ARCHITECTURE.md) specifies the request and storage boundaries.
+No real child records, interview files, private training corpus, biometric input, or provider credentials are needed in the source package or demo. Use synthetic demonstration data and avoid identifiable information in notes. Expedition AI receives the structured context, plan, recomputed result, and booleans for recorded prediction/support. It does not receive learner notes, correction text, the evidence ID, or prior-session history. Arithmetic story requests use operation, operands, theme, and grade; hints use the problem, grade, and operands (the current route sends no attempted answer); parent-note requests use limited summary facts without the child's name. The [architecture](ARCHITECTURE.md) specifies the request and storage boundaries.
 
 This is a local prototype, not a deployed classroom record system or a validated assessment. Broader use requires an appropriate consent and data process, access controls, retention policy, and educational evaluation.

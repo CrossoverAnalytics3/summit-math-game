@@ -1,6 +1,10 @@
-# Three-minute demo — play, teach, inspect
+# Submitted demo — Teach the Climb
 
-Target **2:55**. The accompanying silent walkthrough uses genuine captures of the running v0.5.3 app, edited with cuts and held frames for narration. It shows synthetic demonstration records, not a child study. The footer identifies each scene; there is no generated narration.
+**[Watch / download the submitted video · 2:57](demo/summit-submitted-demo.mp4)**
+
+This is a web-compatible copy of Chris Conyers' submitted `NerdyHackSubConyers.MP4`, including its supplied audio. Duration: **2:56.633**; picture: **1920 × 1080**. It presents the v0.5.3 experience. The application and environment are unchanged by this documentation update.
+
+The footage uses captures of the running product with cuts and held frames for narration, and synthetic demonstration records. The original production guide below describes the intended screen sequence and talk track; it is not a verbatim transcript of the submitted narration.
 
 ## Screen sequence
 
@@ -17,7 +21,7 @@ Target **2:55**. The accompanying silent walkthrough uses genuine captures of th
 | 2:23–2:43 | Result → journal → worksheet evidence | Tutor can inspect the child’s exact response and original page. |
 | 2:43–2:55 | AI boundary / product finish | What code owns, and what to test next. |
 
-## Talk track
+## Production talk track
 
 “Summit starts with a simple problem: a right answer can hide how a child thinks. I wanted to make that thinking visible through play, while giving parents and tutors evidence for a better conversation.
 
@@ -39,13 +43,22 @@ The journal keeps finding, naming, and fixing separate. The tutor can inspect th
 
 Code owns math, scoring, and evidence. Optional AI selects bounded coach content. Next: test children’s unaided explanations and whether these records help tutors choose better questions.”
 
-## Honesty and recording notes
+## Capture notes and feature scope
 
 - The demo correction is explicitly labeled. Fixed-four behavior is mathematically expected; do not narrate it as an actual software bug.
-- No live AI provider is used in the capture. Authored content keeps play working with AI off.
+- The walkthrough was prepared with authored content. The application also implements optional runtime AI: expedition coaching selections and generated arithmetic stories, hints, and parent notes. See the [AI contracts](ARCHITECTURE.md#generative-ai-in-arithmetic-activities) for what each feature does and how outputs are checked.
 - Choosing a reason from chips is recognition, not an independently composed explanation.
 - Journals use one local synthetic learner on SQLite. No authenticated tutor/classroom account claim.
 - The worksheet key and generator seed are not sent before submission. Completed evidence includes checked answers so an adult can inspect the result.
 - Earlier worksheets may lack the exact response. Those missing values are shown as unknown, never invented.
 - The new rule choices apply to the next new arithmetic round; resuming a saved round keeps that round’s original rules.
 - Proposed learning and usability criteria are in [PRODUCT-GUIDE.md](PRODUCT-GUIDE.md). Test results are in [VERIFICATION.md](VERIFICATION.md).
+
+## Video file details
+
+The supplied original is retained unchanged by the author. The repository copy converts its main video stream from HEVC to H.264 for browser compatibility, keeps 1920 × 1080 resolution and all 5299 video frames, and copies the AAC audio without re-encoding. Duration and compressed audio payload hashes match. No cuts, captions, narration, or timing changes were added.
+
+- Original: `NerdyHackSubConyers.MP4` (63557506 bytes).
+- Original SHA-256: `ce2fd6446f7938b4cfdcc33beb4e586444ded8978de02e7f40c30b7c65d7a71f`.
+- Repository copy: `demo/summit-submitted-demo.mp4` (8489968 bytes).
+- Copy SHA-256: `0718ffd8b38dfd701c478b76c002609c88baf911138e8dfd8e5b1e858f5a0886`.

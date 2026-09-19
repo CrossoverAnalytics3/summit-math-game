@@ -1,6 +1,6 @@
 # Summit generated artwork and product capture
 
-Asset: [`web/public/art/summit-island.png`](../web/public/art/summit-island.png)
+Asset: [`web/public/art/summit-island.png`](../../web/public/art/summit-island.png)
 
 Dimensions: 1536 × 1024 pixels.
 
@@ -10,7 +10,7 @@ Visual inspection: the mountain island fills the right side, the left side provi
 
 The README displays the original mountain hero PNG linked above, unchanged from the asset used by the application.
 
-The [Fraction Peaks screenshot](images/fraction-peaks.png) is an unmodified capture of the running application with its synthetic demo profile, recorded September 15, 2026. It shows the actual fraction interface rather than a generated screen mockup. The tower, Pip, symbols, models, and controls are rendered by the application using SVG/CSS/React with AI-assisted implementation.
+The [Fraction Peaks screenshot](../images/fraction-peaks.png) is an unmodified capture of the running application with its synthetic demo profile, recorded September 15, 2026. It shows the actual fraction interface rather than a generated screen mockup. The tower, Pip, symbols, models, and controls are rendered by the application using SVG/CSS/React with AI-assisted implementation.
 
 ## Exact generation prompt
 

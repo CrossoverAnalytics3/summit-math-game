@@ -9,7 +9,7 @@ This document describes version 0.5.3. Current check results belong in [VERIFICA
 | React / TypeScript / Vite   | Route choices, teaching controls, predictions, replay, progression, tutor brief and journal corrections                                        | Mathematical truth through visual appearance alone                                              |
 | Shared deterministic engine | Supported instructions, quantities, contexts, run results, evidence floor and correction dependencies                                          | Long-term mastery, intention or personality                                                     |
 | Express / Node 24 / SQLite  | Validated journal persistence, recomputed outcomes, preserved observations, revision conflicts, model access and inherited arithmetic services | Independent proof of a child's identity or of assistance outside the app                        |
-| Optional Anthropic adapter  | Selects a reviewed question and Pip line using bounded integer IDs                                                                             | Generating report claims, grading, modifying outcomes or retraining itself from a child's input |
+| Expedition AI coach        | Selects a reviewed question and Pip line using bounded integer IDs                                                                             | Generating report claims, grading, modifying outcomes or retraining itself from a child's input |
 | Tutor brief                 | Traceable session observations, uncertainty, support and questions with sufficient eligible sources                                            | A clinical, psychometric or learning-style assessment                                           |
 
 ## Frontend structure
@@ -111,6 +111,20 @@ API credentials belong in a private root `.env`; `.env.example` contains no usab
 `POST /api/teaching/coach` validates route, stage, plan, bounded prediction, support labels, evidence ID and variation, then recomputes the simulation. The provider receives route, stage, quantities, plan, computed shares/leftovers/outcome, and booleans indicating whether a prediction or support was recorded. It receives **no journal notes, correction text, actual prediction, evidence ID or prior-session history**. Explicit coaching requests are limited to twelve per minute per address; ordinary local simulation does not consume that allowance.
 
 The returned evidence ID is a journal reference, not authentication. The response combines selected language with a code-authored description of the actual simulation. The optional model does not generate report claims, determine the evidence floor, change the learner's plan, award progress or retrain itself. Notes and corrections stay in the local journal server and browser cache; JSON exports contain them too. The inherited arithmetic story adapter remains a separate feature with its own boundaries.
+
+### Generative AI in arithmetic activities
+
+`server/src/ai/story.ts` implements three additional runtime AI features through the Anthropic adapter:
+
+| Feature | Context sent | Acceptance checks and fallback |
+| --- | --- | --- |
+| Themed word problem | Operation, operands, theme, grade | Returned story, required operands, no extra digit values, numeric answer-leak check, length, and generated problem range; otherwise an authored story. |
+| Strategy hint | Problem prompt, grade, and operands; the current HTTP route sends no attempted answer | Returned hint, allowed digit values, numeric answer-leak check, and length; otherwise an authored hint. |
+| Parent note | Weakest skill, whether practice occurred, whether a level unlocked | Returned note, no digits, and length; otherwise an authored note. The child's name is not sent. |
+
+The story and hint numeric checks allow an answer that equals a supplied operand. They inspect digit strings and bounded structure; they do not prove that all language is mathematically or pedagogically correct. Provider failures also fall back to authored content. The provenance object records provider, prompt version, fields sent, named checks, and the final `ai` or `template` source. The arithmetic server owns generated problems, accepted answers, scoring, and progression throughout.
+
+These generative features and the expedition's bank selection are distinct AI behaviors. Their proposed usefulness evaluation is described in the [AI product engineering case study](AI-PRODUCT-CASE-STUDY.md).
 
 ## Scope and reuse
 
